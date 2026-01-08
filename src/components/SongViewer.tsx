@@ -9,20 +9,41 @@ type Props = {
   transposeSemitones: number
 }
 
-// Renderiza acordes encima de las letras sin depender de ChordSheetJS
+// Escapa HTML para evitar inyección
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/ /g, '&nbsp;')
+}
+
+// Renderiza acordes encima de las letras
 function renderChordPro(content: string): string {
   const lines = content.split('\n')
   let html = '<div class="song-content">'
+  let consecutiveEmpty = 0
   
   for (const line of lines) {
+    // Líneas vacías = separación de párrafos
     if (line.trim() === '') {
-      html += '<div class="h-4"></div>'
+      consecutiveEmpty++
+      if (consecutiveEmpty <= 2) {
+        html += '<div class="empty-line"></div>'
+      }
+      continue
+    }
+    consecutiveEmpty = 0
+    
+    // Detectar si es línea de sección [Coro], [Verso], etc.
+    const sectionMatch = line.match(/^\{([^}]+)\}$/)
+    if (sectionMatch) {
+      html += `<div class="section-label">${escapeHtml(sectionMatch[1])}</div>`
       continue
     }
     
     // Extraer acordes y texto
     const parts: { chord: string; text: string }[] = []
-    let remaining = line
     let lastIndex = 0
     const regex = /\[([^\]]+)\]/g
     let match
@@ -50,8 +71,14 @@ function renderChordPro(content: string): string {
     }
     
     // Si no hay acordes, mostrar como texto simple
-    if (parts.length === 0 || (parts.length === 1 && !parts[0].chord)) {
-      html += `<div class="lyrics-line">${line}</div>`
+    if (parts.length === 0) {
+      html += `<div class="lyrics-line">${escapeHtml(line)}</div>`
+      continue
+    }
+    
+    const hasChords = parts.some(p => p.chord)
+    if (!hasChords) {
+      html += `<div class="lyrics-line">${escapeHtml(line)}</div>`
       continue
     }
     
@@ -60,12 +87,15 @@ function renderChordPro(content: string): string {
     let textLine = '<div class="text-line">'
     
     for (const part of parts) {
-      const textLen = Math.max(part.text.length, part.chord.length + 1)
-      const paddedChord = part.chord.padEnd(textLen, ' ')
-      const paddedText = part.text.padEnd(textLen, ' ')
+      const chordLen = part.chord.length
+      const textLen = part.text.length
+      const minWidth = Math.max(chordLen + 1, textLen)
       
-      chordLine += `<span class="chord">${paddedChord}</span>`
-      textLine += `<span class="lyric">${paddedText}</span>`
+      const displayChord = escapeHtml(part.chord.padEnd(minWidth, ' '))
+      const displayText = escapeHtml(part.text.padEnd(minWidth, ' '))
+      
+      chordLine += `<span class="chord-span">${displayChord}</span>`
+      textLine += `<span class="text-span">${displayText}</span>`
     }
     
     chordLine += '</div>'
@@ -77,6 +107,7 @@ function renderChordPro(content: string): string {
   html += '</div>'
   return html
 }
+
 
 export default function SongViewer({ content, originalKey, transposeSemitones }: Props) {
   const renderedContent = useMemo(() => {
@@ -95,16 +126,41 @@ export default function SongViewer({ content, originalKey, transposeSemitones }:
         )}
       </div>
       <div 
-        className="chord-sheet font-mono text-lg leading-relaxed"
+        className="chord-sheet font-mono"
         dangerouslySetInnerHTML={{ __html: renderedContent }}
       />
       <style jsx global>{`
-        .song-content { white-space: pre-wrap; }
-        .line-group { margin-bottom: 0.25rem; }
-        .chord-line { color: #4338ca; font-weight: bold; font-size: 0.95em; height: 1.4em; }
-        .text-line { color: #000000; font-size: 1.1em; }
-        .lyrics-line { color: #000000; font-size: 1.1em; margin-bottom: 0.25rem; }
-        .chord, .lyric { white-space: pre; }
+        .song-content { }
+        .empty-line { height: 1.2rem; }
+        .section-label { 
+          font-weight: bold; 
+          color: #6366f1; 
+          font-size: 0.9em; 
+          margin: 1rem 0 0.5rem 0;
+          text-transform: uppercase;
+        }
+        .line-group { margin-bottom: 0.5rem; }
+        .chord-line { 
+          color: #4338ca; 
+          font-weight: bold; 
+          font-size: 1rem; 
+          line-height: 1.3;
+        }
+        .text-line { 
+          color: #000000; 
+          font-size: 1.15rem; 
+          line-height: 1.4;
+        }
+        .lyrics-line { 
+          color: #000000; 
+          font-size: 1.15rem; 
+          line-height: 1.4;
+          margin-bottom: 0.3rem; 
+        }
+        .chord-span, .text-span { 
+          display: inline;
+          white-space: pre;
+        }
       `}</style>
     </div>
   )
