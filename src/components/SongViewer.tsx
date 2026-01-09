@@ -9,110 +9,139 @@ type Props = {
   transposeSemitones: number
 }
 
-// Escapa HTML para evitar inyección
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/ /g, '&nbsp;')
+// Detectar si una línea es solo acordes
+function isChordLine(line: string): boolean {
+  const trimmed = line.trim()
+  if (!trimmed) return false
+  const words = trimmed.split(/\s+/)
+  const chordPattern = /^[A-G][#b]?(m|maj|min|dim|aug|sus|add|7|9|11|13|6|5|2|4)?(\/[A-G][#b]?)?$/i
+  const chordWords = words.filter(w => chordPattern.test(w) || /^\[.*\]$/.test(w))
+  return chordWords.length > 0 && chordWords.length >= words.length * 0.5
 }
 
-// Renderiza acordes encima de las letras
-function renderChordPro(content: string): string {
-  const lines = content.split('\n')
-  let html = '<div class="song-content">'
-  let consecutiveEmpty = 0
+// Transponer acordes en texto plano (sin corchetes)
+function transposePlainChords(line: string, semitones: number): string {
+  if (semitones === 0) return line
+  const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+  const NOTES_FLAT = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B']
   
-  for (const line of lines) {
-    // Líneas vacías = separación de párrafos
-    if (line.trim() === '') {
-      consecutiveEmpty++
-      if (consecutiveEmpty <= 2) {
-        html += '<div class="empty-line"></div>'
-      }
-      continue
-    }
-    consecutiveEmpty = 0
+  return line.replace(/\b([A-G][#b]?)(m|maj|min|dim|aug|sus|add|7|9|11|13|6|5|2|4)?(\/[A-G][#b]?)?\b/g, (match, root, suffix, bass) => {
+    let noteIndex = NOTES.indexOf(root)
+    if (noteIndex === -1) noteIndex = NOTES_FLAT.indexOf(root)
+    if (noteIndex === -1) return match
     
-    // Detectar si es línea de sección [Coro], [Verso], etc.
-    const sectionMatch = line.match(/^\{([^}]+)\}$/)
-    if (sectionMatch) {
-      html += `<div class="section-label">${escapeHtml(sectionMatch[1])}</div>`
-      continue
-    }
+    const newIndex = (noteIndex + semitones + 12) % 12
+    const useFlats = root.includes('b')
+    const newRoot = useFlats ? NOTES_FLAT[newIndex] : NOTES[newIndex]
     
-    // Extraer acordes y texto
-    const parts: { chord: string; text: string }[] = []
-    let lastIndex = 0
-    const regex = /\[([^\]]+)\]/g
-    let match
+    let result = newRoot + (suffix || '')
     
-    while ((match = regex.exec(line)) !== null) {
-      // Texto antes del acorde
-      if (match.index > lastIndex) {
-        if (parts.length > 0) {
-          parts[parts.length - 1].text += line.substring(lastIndex, match.index)
-        } else {
-          parts.push({ chord: '', text: line.substring(lastIndex, match.index) })
-        }
-      }
-      parts.push({ chord: match[1], text: '' })
-      lastIndex = match.index + match[0].length
-    }
-    
-    // Texto restante
-    if (lastIndex < line.length) {
-      if (parts.length > 0) {
-        parts[parts.length - 1].text += line.substring(lastIndex)
-      } else {
-        parts.push({ chord: '', text: line.substring(lastIndex) })
+    if (bass) {
+      const bassNote = bass.substring(1)
+      let bassIndex = NOTES.indexOf(bassNote)
+      if (bassIndex === -1) bassIndex = NOTES_FLAT.indexOf(bassNote)
+      if (bassIndex !== -1) {
+        const newBassIndex = (bassIndex + semitones + 12) % 12
+        const newBass = useFlats ? NOTES_FLAT[newBassIndex] : NOTES[newBassIndex]
+        result += '/' + newBass
       }
     }
     
-    // Si no hay acordes, mostrar como texto simple
-    if (parts.length === 0) {
-      html += `<div class="lyrics-line">${escapeHtml(line)}</div>`
-      continue
-    }
-    
-    const hasChords = parts.some(p => p.chord)
-    if (!hasChords) {
-      html += `<div class="lyrics-line">${escapeHtml(line)}</div>`
-      continue
-    }
-    
-    // Construir línea con acordes arriba
-    let chordLine = '<div class="chord-line">'
-    let textLine = '<div class="text-line">'
-    
-    for (const part of parts) {
-      const chordLen = part.chord.length
-      const textLen = part.text.length
-      const minWidth = Math.max(chordLen + 1, textLen)
-      
-      const displayChord = escapeHtml(part.chord.padEnd(minWidth, ' '))
-      const displayText = escapeHtml(part.text.padEnd(minWidth, ' '))
-      
-      chordLine += `<span class="chord-span">${displayChord}</span>`
-      textLine += `<span class="text-span">${displayText}</span>`
-    }
-    
-    chordLine += '</div>'
-    textLine += '</div>'
-    
-    html += `<div class="line-group">${chordLine}${textLine}</div>`
-  }
-  
-  html += '</div>'
-  return html
+    return result
+  })
 }
-
 
 export default function SongViewer({ content, originalKey, transposeSemitones }: Props) {
   const renderedContent = useMemo(() => {
-    const transposedContent = transposeContent(content, transposeSemitones)
-    return renderChordPro(transposedContent)
+    // Primero transponer formato [G]texto
+    const processed = transposeContent(content, transposeSemitones)
+    
+    const lines = processed.split('\n')
+    const elements: JSX.Element[] = []
+    let i = 0
+
+    while (i < lines.length) {
+      const line = lines[i]
+      
+      // Línea vacía = espacio entre párrafos
+      if (line.trim() === '') {
+        elements.push(<div key={`empty-${i}`} className="h-5" />)
+        i++
+        continue
+      }
+      
+      // Línea con solo guiones o puntos = ignorar
+      if (/^[\s\-_\.]+$/.test(line.trim())) {
+        elements.push(<div key={`space-${i}`} className="h-3" />)
+        i++
+        continue
+      }
+
+      // Si tiene formato [G]texto, procesar ese formato
+      if (line.includes('[') && line.includes(']')) {
+        const chords: { chord: string; position: number }[] = []
+        let cleanLine = ''
+        const regex = /\[([^\]]+)\]/g
+        let lastIndex = 0
+        let match
+
+        while ((match = regex.exec(line)) !== null) {
+          cleanLine += line.substring(lastIndex, match.index)
+          chords.push({ chord: match[1], position: cleanLine.length })
+          lastIndex = match.index + match[0].length
+        }
+        cleanLine += line.substring(lastIndex)
+
+        if (chords.length > 0) {
+          let chordLine = ''
+          chords.forEach(({ chord, position }) => {
+            while (chordLine.length < position) chordLine += ' '
+            chordLine += chord + ' '
+          })
+
+          elements.push(
+            <div key={`inline-${i}`} className="mb-4">
+              <div className="text-indigo-600 font-bold font-mono whitespace-pre text-base">{chordLine}</div>
+              <div className="text-gray-900 font-mono whitespace-pre text-lg">{cleanLine}</div>
+            </div>
+          )
+        } else {
+          elements.push(<div key={`text-${i}`} className="text-gray-900 text-lg mb-1 whitespace-pre">{line}</div>)
+        }
+        i++
+        continue
+      }
+
+      // Línea de acordes (formato tradicional arriba)
+      if (isChordLine(line)) {
+        const chordLine = transposePlainChords(line, transposeSemitones)
+        const nextLine = lines[i + 1] || ''
+        
+        if (nextLine && !isChordLine(nextLine) && nextLine.trim() !== '') {
+          elements.push(
+            <div key={`pair-${i}`} className="mb-4">
+              <div className="text-indigo-600 font-bold font-mono whitespace-pre text-base">{chordLine}</div>
+              <div className="text-gray-900 font-mono whitespace-pre text-lg">{nextLine}</div>
+            </div>
+          )
+          i += 2
+        } else {
+          elements.push(
+            <div key={`chords-${i}`} className="text-indigo-600 font-bold font-mono whitespace-pre text-base mb-2">{chordLine}</div>
+          )
+          i++
+        }
+        continue
+      }
+
+      // Línea normal de texto
+      elements.push(
+        <div key={`line-${i}`} className="text-gray-900 text-lg mb-1 whitespace-pre font-mono">{line}</div>
+      )
+      i++
+    }
+
+    return elements
   }, [content, transposeSemitones])
 
   const currentKey = getKeyFromSemitones(originalKey, transposeSemitones)
@@ -125,52 +154,9 @@ export default function SongViewer({ content, originalKey, transposeSemitones }:
           <span className="ml-2 text-gray-500">(Original: {originalKey})</span>
         )}
       </div>
-      <div 
-        className="chord-sheet font-mono"
-        dangerouslySetInnerHTML={{ __html: renderedContent }}
-      />
-      <style jsx global>{`
-        .song-content { }
-        .empty-line { height: 1.5rem; display: block; }
-        .section-label { 
-          font-weight: bold; 
-          color: #6366f1; 
-          font-size: 0.95em; 
-          margin: 1.5rem 0 0.75rem 0;
-          text-transform: uppercase;
-          display: block;
-        }
-        .line-group { 
-          margin-bottom: 0.75rem; 
-          display: block;
-        }
-        .chord-line { 
-          color: #4338ca; 
-          font-weight: bold; 
-          font-size: 1.05rem; 
-          line-height: 1.4;
-          display: block;
-          min-height: 1.5rem;
-        }
-        .text-line { 
-          color: #000000; 
-          font-size: 1.2rem; 
-          line-height: 1.5;
-          display: block;
-        }
-        .lyrics-line { 
-          color: #000000; 
-          font-size: 1.2rem; 
-          line-height: 1.5;
-          margin-bottom: 0.5rem;
-          display: block;
-        }
-        .chord-span, .text-span { 
-          display: inline;
-          white-space: pre;
-          font-family: 'Courier New', Courier, monospace;
-        }
-      `}</style>
+      <div className="leading-relaxed">
+        {renderedContent}
+      </div>
     </div>
   )
 }
