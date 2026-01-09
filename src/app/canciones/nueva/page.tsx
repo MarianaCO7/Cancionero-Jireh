@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { supabase, TEMPOS, DEFAULT_CATEGORIES } from '@/lib/supabase'
 
 const KEYS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 
@@ -16,7 +16,10 @@ export default function NewSongPage() {
     original_key: 'G',
     key_male: 'G',
     key_female: 'B',
+    tempo: 'media',
+    category: '',
   })
+  const [customCategory, setCustomCategory] = useState('')
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -67,9 +70,61 @@ export default function NewSongPage() {
             type="text"
             value={form.author}
             onChange={(e) => setForm({ ...form, author: e.target.value })}
-            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 text-black"
             placeholder="Thomas Chisholm / Marcos Witt"
           />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Tempo
+            </label>
+            <select
+              value={form.tempo}
+              onChange={(e) => setForm({ ...form, tempo: e.target.value })}
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 text-black bg-white"
+            >
+              {TEMPOS.map(t => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Categoría
+            </label>
+            <select
+              value={form.category}
+              onChange={(e) => {
+                if (e.target.value === '__custom__') {
+                  setCustomCategory('')
+                } else {
+                  setForm({ ...form, category: e.target.value })
+                  setCustomCategory('')
+                }
+              }}
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 text-black bg-white"
+            >
+              <option value="">Sin categoría</option>
+              {DEFAULT_CATEGORIES.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+              <option value="__custom__">+ Otra...</option>
+            </select>
+            {(form.category === '__custom__' || customCategory) && (
+              <input
+                type="text"
+                value={customCategory}
+                onChange={(e) => {
+                  setCustomCategory(e.target.value)
+                  setForm({ ...form, category: e.target.value })
+                }}
+                className="w-full mt-2 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 text-black"
+                placeholder="Escribe la categoría..."
+              />
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-3 gap-4">

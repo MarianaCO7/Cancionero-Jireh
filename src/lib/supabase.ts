@@ -13,8 +13,24 @@ export type Song = {
   original_key: string
   key_male: string
   key_female: string
+  tempo: string
+  category: string
   created_at: string
 }
+
+export const TEMPOS = [
+  { value: 'rapida', label: '🏃 Rápida' },
+  { value: 'media', label: '🚶 Media' },
+  { value: 'lenta', label: '🧘 Lenta' },
+]
+
+export const DEFAULT_CATEGORIES = [
+  'Alabanza',
+  'Adoración', 
+  'Himno',
+  'Oración',
+  'Especial',
+]
 
 export type Setlist = {
   id: string

@@ -131,35 +131,44 @@ export default function SongViewer({ content, originalKey, transposeSemitones }:
       />
       <style jsx global>{`
         .song-content { }
-        .empty-line { height: 1.2rem; }
+        .empty-line { height: 1.5rem; display: block; }
         .section-label { 
           font-weight: bold; 
           color: #6366f1; 
-          font-size: 0.9em; 
-          margin: 1rem 0 0.5rem 0;
+          font-size: 0.95em; 
+          margin: 1.5rem 0 0.75rem 0;
           text-transform: uppercase;
+          display: block;
         }
-        .line-group { margin-bottom: 0.5rem; }
+        .line-group { 
+          margin-bottom: 0.75rem; 
+          display: block;
+        }
         .chord-line { 
           color: #4338ca; 
           font-weight: bold; 
-          font-size: 1rem; 
-          line-height: 1.3;
+          font-size: 1.05rem; 
+          line-height: 1.4;
+          display: block;
+          min-height: 1.5rem;
         }
         .text-line { 
           color: #000000; 
-          font-size: 1.15rem; 
-          line-height: 1.4;
+          font-size: 1.2rem; 
+          line-height: 1.5;
+          display: block;
         }
         .lyrics-line { 
           color: #000000; 
-          font-size: 1.15rem; 
-          line-height: 1.4;
-          margin-bottom: 0.3rem; 
+          font-size: 1.2rem; 
+          line-height: 1.5;
+          margin-bottom: 0.5rem;
+          display: block;
         }
         .chord-span, .text-span { 
           display: inline;
           white-space: pre;
+          font-family: 'Courier New', Courier, monospace;
         }
       `}</style>
     </div>

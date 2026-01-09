@@ -10,6 +10,8 @@ CREATE TABLE songs (
   original_key TEXT NOT NULL DEFAULT 'G',
   key_male TEXT NOT NULL DEFAULT 'G',
   key_female TEXT NOT NULL DEFAULT 'B',
+  tempo TEXT DEFAULT 'media',
+  category TEXT DEFAULT '',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
