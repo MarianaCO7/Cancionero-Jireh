@@ -26,7 +26,8 @@ export default function Home() {
     if (!error && data) {
       setSongs(data)
       // Extraer categorías únicas
-      const uniqueCategories = [...new Set(data.map(s => s.category).filter(Boolean))]
+      const cats = data.map(s => s.category).filter(Boolean)
+      const uniqueCategories = Array.from(new Set(cats)) as string[]
       setCategories(uniqueCategories)
     }
     setLoading(false)
