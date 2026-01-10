@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import { supabase, Song } from '@/lib/supabase'
+import { supabase, Song, SetlistSong } from '@/lib/supabase'
 import SongViewer from '@/components/SongViewer'
 import SongEditor from '@/components/SongEditor'
 import Transposer from '@/components/Transposer'
@@ -15,6 +15,7 @@ export default function SongPage() {
   const searchParams = useSearchParams()
   const fromSetlist = searchParams.get('from') === 'setlist'
   const setlistId = searchParams.get('setlistId')
+  const positionParam = searchParams.get('position')
   
   const [song, setSong] = useState<Song | null>(null)
   const [loading, setLoading] = useState(true)
@@ -24,6 +25,11 @@ export default function SongPage() {
   const [fontSize, setFontSize] = useState(16)
   const [transposeSemitones, setTransposeSemitones] = useState(0)
   const printRef = useRef<HTMLDivElement>(null)
+  
+  // Estado para navegación del setlist
+  const [setlistSongs, setSetlistSongs] = useState<SetlistSong[]>([])
+  const [currentPosition, setCurrentPosition] = useState(0)
+  const [currentSetlistSong, setCurrentSetlistSong] = useState<SetlistSong | null>(null)
 
   const handlePrint = useReactToPrint({
     contentRef: printRef,
@@ -32,7 +38,25 @@ export default function SongPage() {
 
   useEffect(() => {
     loadSong()
-  }, [params.id])
+    if (fromSetlist && setlistId) {
+      loadSetlistSongs()
+    }
+  }, [params.id, setlistId])
+
+  // Actualizar posición cuando cambia
+  useEffect(() => {
+    if (positionParam !== null) {
+      setCurrentPosition(parseInt(positionParam))
+    }
+  }, [positionParam])
+
+  // Encontrar la canción actual en el setlist
+  useEffect(() => {
+    if (setlistSongs.length > 0) {
+      const current = setlistSongs.find(ss => ss.song_id === params.id)
+      setCurrentSetlistSong(current || null)
+    }
+  }, [setlistSongs, params.id])
 
   // Cerrar pantalla completa con Escape
   useEffect(() => {
@@ -50,6 +74,44 @@ export default function SongPage() {
       router.push('/')
     }
   }
+
+  async function loadSetlistSongs() {
+    if (!setlistId) return
+    const { data } = await supabase
+      .from('setlist_songs')
+      .select('*, song:songs(*)')
+      .eq('setlist_id', setlistId)
+      .order('position')
+    if (data) {
+      setSetlistSongs(data)
+    }
+  }
+
+  function navigateTo(direction: 'prev' | 'next') {
+    if (!fromSetlist || !setlistId || setlistSongs.length === 0) return
+    
+    const currentIdx = setlistSongs.findIndex(ss => ss.song_id === params.id)
+    if (currentIdx === -1) return
+    
+    const newIdx = direction === 'prev' ? currentIdx - 1 : currentIdx + 1
+    if (newIdx < 0 || newIdx >= setlistSongs.length) return
+    
+    const nextSong = setlistSongs[newIdx]
+    router.push(`/canciones/${nextSong.song_id}?from=setlist&setlistId=${setlistId}&position=${newIdx}`)
+  }
+
+  const canNavigatePrev = fromSetlist && setlistSongs.length > 0 && 
+    setlistSongs.findIndex(ss => ss.song_id === params.id) > 0
+  const canNavigateNext = fromSetlist && setlistSongs.length > 0 && 
+    setlistSongs.findIndex(ss => ss.song_id === params.id) < setlistSongs.length - 1
+  
+  // Verificar si la canción anterior está enganchada con esta
+  const prevSong = setlistSongs[setlistSongs.findIndex(ss => ss.song_id === params.id) - 1]
+  const isLinkedFromPrev = prevSong?.linked_to_next === true
+  
+  // Verificar si esta canción está enganchada con la siguiente
+  const isLinkedToNext = currentSetlistSong?.linked_to_next === true
+  const nextSong = setlistSongs[setlistSongs.findIndex(ss => ss.song_id === params.id) + 1]
 
   async function loadSong() {
     const { data, error } = await supabase
@@ -114,7 +176,27 @@ export default function SongPage() {
             >
               ✕
             </button>
+            {fromSetlist && canNavigatePrev && (
+              <button
+                onClick={() => navigateTo('prev')}
+                className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200"
+                title={prevSong?.song?.title}
+              >
+                ◀
+              </button>
+            )}
             <span className="font-bold text-gray-800 truncate max-w-[150px]">{song.title}</span>
+            {fromSetlist && canNavigateNext && (
+              <button
+                onClick={() => navigateTo('next')}
+                className={`p-2 rounded-lg hover:bg-gray-200 ${
+                  isLinkedToNext ? 'bg-indigo-100 text-indigo-600' : 'bg-gray-100'
+                }`}
+                title={isLinkedToNext ? `🔗 ${nextSong?.song?.title}` : nextSong?.song?.title}
+              >
+                ▶ {isLinkedToNext && '🔗'}
+              </button>
+            )}
           </div>
           
           <div className="flex items-center gap-1">
@@ -143,6 +225,25 @@ export default function SongPage() {
           />
         </div>
         
+        {/* Indicador de enganche */}
+        {isLinkedFromPrev && (
+          <div className="bg-indigo-100 text-indigo-700 text-sm py-2 px-4 text-center">
+            🔗 Viene enganchada de "{prevSong?.song?.title}"
+          </div>
+        )}
+        {isLinkedToNext && (
+          <div className="bg-indigo-100 text-indigo-700 text-sm py-2 px-4 text-center">
+            🔗 Continúa con "{nextSong?.song?.title}" (sin parar)
+          </div>
+        )}
+        
+        {/* Notas del setlist */}
+        {currentSetlistSong?.notes && (
+          <div className="bg-yellow-50 text-yellow-800 text-sm py-2 px-4">
+            📝 {currentSetlistSong.notes}
+          </div>
+        )}
+        
         {/* Contenido */}
         <div className="p-4" style={{ fontSize: `${fontSize}px` }}>
           <SongViewer
@@ -157,6 +258,68 @@ export default function SongPage() {
 
   return (
     <div className="space-y-6">
+      {/* Barra de navegación del setlist */}
+      {fromSetlist && setlistSongs.length > 0 && (
+        <div className="bg-indigo-50 rounded-lg p-3 flex items-center justify-between">
+          <button
+            onClick={() => navigateTo('prev')}
+            disabled={!canNavigatePrev}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg transition ${
+              canNavigatePrev 
+                ? 'bg-white hover:bg-indigo-100 text-indigo-600' 
+                : 'opacity-30 cursor-not-allowed'
+            }`}
+          >
+            ◀ {canNavigatePrev && <span className="text-sm truncate max-w-[100px]">{prevSong?.song?.title}</span>}
+          </button>
+          
+          <div className="text-center">
+            <span className="text-sm text-indigo-600">
+              {setlistSongs.findIndex(ss => ss.song_id === params.id) + 1} / {setlistSongs.length}
+            </span>
+          </div>
+          
+          <button
+            onClick={() => navigateTo('next')}
+            disabled={!canNavigateNext}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg transition ${
+              canNavigateNext 
+                ? isLinkedToNext 
+                  ? 'bg-indigo-200 hover:bg-indigo-300 text-indigo-700' 
+                  : 'bg-white hover:bg-indigo-100 text-indigo-600'
+                : 'opacity-30 cursor-not-allowed'
+            }`}
+          >
+            {canNavigateNext && (
+              <>
+                {isLinkedToNext && <span className="text-lg">🔗</span>}
+                <span className="text-sm truncate max-w-[100px]">{nextSong?.song?.title}</span>
+              </>
+            )}
+            ▶
+          </button>
+        </div>
+      )}
+
+      {/* Indicadores de enganche */}
+      {fromSetlist && isLinkedFromPrev && (
+        <div className="bg-indigo-100 text-indigo-700 text-sm py-2 px-4 rounded-lg text-center">
+          🔗 Viene enganchada de "{prevSong?.song?.title}"
+        </div>
+      )}
+      {fromSetlist && isLinkedToNext && (
+        <div className="bg-indigo-100 text-indigo-700 text-sm py-2 px-4 rounded-lg text-center">
+          🔗 Continúa con "{nextSong?.song?.title}" sin parar
+        </div>
+      )}
+      
+      {/* Notas del setlist */}
+      {fromSetlist && currentSetlistSong?.notes && (
+        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 py-3 px-4 rounded-lg">
+          📝 <strong>Notas:</strong> {currentSetlistSong.notes}
+        </div>
+      )}
+
       {/* Botón volver */}
       <button
         onClick={handleBack}

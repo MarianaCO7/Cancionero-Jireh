@@ -43,7 +43,7 @@ export default function SetlistPage() {
     const position = setlistSongs.length + 1
     const { error } = await supabase
       .from('setlist_songs')
-      .insert([{ setlist_id: params.id, song_id: songId, position }])
+      .insert([{ setlist_id: params.id, song_id: songId, position, linked_to_next: false, notes: '' }])
 
     if (!error) {
       loadData()
@@ -54,6 +54,30 @@ export default function SetlistPage() {
   async function removeSongFromSetlist(id: string) {
     const { error } = await supabase.from('setlist_songs').delete().eq('id', id)
     if (!error) loadData()
+  }
+
+  // Toggle enganche
+  async function toggleLink(id: string, currentValue: boolean) {
+    const { error } = await supabase
+      .from('setlist_songs')
+      .update({ linked_to_next: !currentValue })
+      .eq('id', id)
+    if (!error) {
+      setSetlistSongs(prev => prev.map(ss => 
+        ss.id === id ? { ...ss, linked_to_next: !currentValue } : ss
+      ))
+    }
+  }
+
+  // Actualizar notas
+  async function updateNotes(id: string, notes: string) {
+    await supabase
+      .from('setlist_songs')
+      .update({ notes })
+      .eq('id', id)
+    setSetlistSongs(prev => prev.map(ss => 
+      ss.id === id ? { ...ss, notes } : ss
+    ))
   }
 
   // Drag and drop handlers
@@ -164,54 +188,100 @@ export default function SetlistPage() {
         {setlistSongs.length === 0 ? (
           <p className="text-gray-500 text-center py-4">No hay canciones en este setlist</p>
         ) : (
-          <ol className="space-y-2">
+          <ol className="space-y-1">
             {setlistSongs.map((ss, index) => (
-              <li 
-                key={ss.id} 
-                draggable
-                onDragStart={() => handleDragStart(index)}
-                onDragOver={(e) => handleDragOver(e, index)}
-                onDragEnd={handleDragEnd}
-                className={`flex items-center justify-between p-3 bg-gray-50 rounded-lg cursor-move ${
-                  draggedIndex === index ? 'opacity-50 border-2 border-indigo-400' : ''
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  {/* Botones de orden */}
-                  <div className="flex flex-col gap-0.5 print:hidden">
+              <div key={ss.id}>
+                <li 
+                  draggable
+                  onDragStart={() => handleDragStart(index)}
+                  onDragOver={(e) => handleDragOver(e, index)}
+                  onDragEnd={handleDragEnd}
+                  className={`p-3 bg-gray-50 rounded-lg cursor-move ${
+                    draggedIndex === index ? 'opacity-50 border-2 border-indigo-400' : ''
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      {/* Botones de orden */}
+                      <div className="flex flex-col gap-0.5 print:hidden">
+                        <button
+                          onClick={() => moveUp(index)}
+                          disabled={index === 0}
+                          className="w-5 h-5 text-xs bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-30"
+                        >
+                          ▲
+                        </button>
+                        <button
+                          onClick={() => moveDown(index)}
+                          disabled={index === setlistSongs.length - 1}
+                          className="w-5 h-5 text-xs bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-30"
+                        >
+                          ▼
+                        </button>
+                      </div>
+                      <span className="w-6 h-6 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-sm font-medium">
+                        {index + 1}
+                      </span>
+                      <a 
+                        href={`/canciones/${ss.song_id}?from=setlist&setlistId=${params.id}&position=${index}`}
+                        className="font-medium hover:text-indigo-600"
+                      >
+                        {ss.song?.title}
+                      </a>
+                      <span className="text-sm text-gray-400">{ss.song?.original_key}</span>
+                      {ss.song?.bpm && (
+                        <span className="text-xs text-gray-400">🥁 {ss.song.bpm}</span>
+                      )}
+                    </div>
                     <button
-                      onClick={() => moveUp(index)}
-                      disabled={index === 0}
-                      className="w-5 h-5 text-xs bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-30"
+                      onClick={() => removeSongFromSetlist(ss.id)}
+                      className="text-red-500 hover:text-red-700 print:hidden"
                     >
-                      ▲
-                    </button>
-                    <button
-                      onClick={() => moveDown(index)}
-                      disabled={index === setlistSongs.length - 1}
-                      className="w-5 h-5 text-xs bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-30"
-                    >
-                      ▼
+                      ✕
                     </button>
                   </div>
-                  <span className="w-6 h-6 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-sm font-medium">
-                    {index + 1}
-                  </span>
-                  <a 
-                    href={`/canciones/${ss.song_id}?from=setlist&setlistId=${params.id}`}
-                    className="font-medium hover:text-indigo-600"
-                  >
-                    {ss.song?.title}
-                  </a>
-                  <span className="text-sm text-gray-400">{ss.song?.original_key}</span>
-                </div>
-                <button
-                  onClick={() => removeSongFromSetlist(ss.id)}
-                  className="text-red-500 hover:text-red-700 print:hidden"
-                >
-                  ✕
-                </button>
-              </li>
+                  
+                  {/* Campo de notas */}
+                  <div className="mt-2 ml-14 print:hidden">
+                    <input
+                      type="text"
+                      placeholder="📝 Notas para esta canción..."
+                      value={ss.notes || ''}
+                      onChange={(e) => updateNotes(ss.id, e.target.value)}
+                      className="w-full text-sm px-2 py-1 bg-white border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-indigo-300"
+                    />
+                  </div>
+                  {/* Mostrar notas en print si hay */}
+                  {ss.notes && (
+                    <p className="hidden print:block mt-1 ml-14 text-sm text-gray-600 italic">
+                      📝 {ss.notes}
+                    </p>
+                  )}
+                </li>
+                
+                {/* Botón de enganche - solo si no es la última canción */}
+                {index < setlistSongs.length - 1 && (
+                  <div className="flex justify-center py-1 print:hidden">
+                    <button
+                      onClick={() => toggleLink(ss.id, ss.linked_to_next || false)}
+                      className={`px-3 py-1 text-xs rounded-full transition-all ${
+                        ss.linked_to_next 
+                          ? 'bg-indigo-500 text-white hover:bg-indigo-600' 
+                          : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                      }`}
+                      title={ss.linked_to_next ? 'Canciones enganchadas' : 'Enganchar con la siguiente'}
+                    >
+                      🔗 {ss.linked_to_next ? 'Enganchada' : 'Enganchar'}
+                    </button>
+                  </div>
+                )}
+                {/* Mostrar visual de enganche en print */}
+                {ss.linked_to_next && index < setlistSongs.length - 1 && (
+                  <div className="hidden print:flex justify-center py-1">
+                    <span className="text-indigo-600 text-sm">🔗 Enganche</span>
+                  </div>
+                )}
+              </div>
             ))}
           </ol>
         )}

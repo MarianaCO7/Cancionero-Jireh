@@ -30,6 +30,8 @@ CREATE TABLE setlist_songs (
   setlist_id UUID REFERENCES setlists(id) ON DELETE CASCADE,
   song_id UUID REFERENCES songs(id) ON DELETE CASCADE,
   position INTEGER NOT NULL DEFAULT 0,
+  linked_to_next BOOLEAN DEFAULT FALSE,
+  notes TEXT DEFAULT '',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

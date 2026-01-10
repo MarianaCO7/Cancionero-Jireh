@@ -45,5 +45,7 @@ export type SetlistSong = {
   setlist_id: string
   song_id: string
   position: number
+  linked_to_next: boolean
+  notes: string
   song?: Song
 }
