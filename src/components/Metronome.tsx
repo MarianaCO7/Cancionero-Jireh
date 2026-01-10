@@ -14,72 +14,81 @@ export default function Metronome({ initialBpm = 120, onSave, readOnly = false }
   const [currentBeat, setCurrentBeat] = useState(0)
   
   const audioContext = useRef<AudioContext | null>(null)
-  const nextNoteTime = useRef(0)
-  const timerID = useRef<number | null>(null)
-  const lookahead = 25.0 // how frequently to call scheduling function (ms)
-  const scheduleAheadTime = 0.1 // how far ahead to schedule audio (s)
+  const intervalRef = useRef<number | null>(null)
+  const beatRef = useRef(0)
+  const bpmRef = useRef(bpm)
 
-  const playClick = useCallback((time: number, isFirstBeat: boolean) => {
+  // Mantener bpmRef sincronizado con bpm para cambios en tiempo real
+  useEffect(() => {
+    bpmRef.current = bpm
+  }, [bpm])
+
+  const playClick = useCallback((isFirstBeat: boolean) => {
     if (!audioContext.current) return
     
     const osc = audioContext.current.createOscillator()
     const envelope = audioContext.current.createGain()
 
     osc.frequency.value = isFirstBeat ? 1000 : 800
-    envelope.gain.value = 1
-    envelope.gain.exponentialRampToValueAtTime(0.001, time + 0.1)
+    envelope.gain.value = 0.5
+    envelope.gain.exponentialRampToValueAtTime(0.001, audioContext.current.currentTime + 0.1)
 
     osc.connect(envelope)
     envelope.connect(audioContext.current.destination)
 
-    osc.start(time)
-    osc.stop(time + 0.1)
+    osc.start(audioContext.current.currentTime)
+    osc.stop(audioContext.current.currentTime + 0.1)
   }, [])
 
-  const scheduler = useCallback(() => {
-    if (!audioContext.current) return
-    
-    while (nextNoteTime.current < audioContext.current.currentTime + scheduleAheadTime) {
-      const isFirstBeat = currentBeatRef.current % 4 === 0
-      playClick(nextNoteTime.current, isFirstBeat)
-      
-      const secondsPerBeat = 60.0 / bpm
-      nextNoteTime.current += secondsPerBeat
-      
-      const beatValue = currentBeatRef.current
-      setTimeout(() => {
-        setCurrentBeat((beatValue % 4))
-      }, (nextNoteTime.current - audioContext.current.currentTime) * 1000)
-
-      currentBeatRef.current++
+  const startMetronome = useCallback(() => {
+    if (!audioContext.current) {
+      const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+      audioContext.current = new AudioContextClass()
     }
-    timerID.current = window.setTimeout(scheduler, lookahead)
-  }, [bpm, playClick])
+    
+    beatRef.current = 0
+    setCurrentBeat(0)
+    
+    // Primer click inmediato
+    playClick(true)
+    setCurrentBeat(0)
+    beatRef.current = 1
 
-  const currentBeatRef = useRef(0)
+    // Función que calcula el intervalo dinámicamente usando bpmRef
+    const tick = () => {
+      const interval = 60000 / bpmRef.current
+      playClick(beatRef.current % 4 === 0)
+      setCurrentBeat(beatRef.current % 4)
+      beatRef.current++
+      intervalRef.current = window.setTimeout(tick, interval)
+    }
+
+    const initialInterval = 60000 / bpmRef.current
+    intervalRef.current = window.setTimeout(tick, initialInterval)
+  }, [playClick])
+
+  const stopMetronome = useCallback(() => {
+    if (intervalRef.current) {
+      clearTimeout(intervalRef.current)
+      intervalRef.current = null
+    }
+  }, [])
 
   const toggleMetronome = () => {
     if (!isPlaying) {
-      if (!audioContext.current) {
-        const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
-        audioContext.current = new AudioContextClass()
-      }
       setIsPlaying(true)
-      currentBeatRef.current = 0
-      setCurrentBeat(0)
-      nextNoteTime.current = audioContext.current.currentTime + 0.05
-      scheduler()
+      startMetronome()
     } else {
       setIsPlaying(false)
-      if (timerID.current) clearTimeout(timerID.current)
+      stopMetronome()
     }
   }
 
   useEffect(() => {
     return () => {
-      if (timerID.current) clearTimeout(timerID.current)
+      stopMetronome()
     }
-  }, [])
+  }, [stopMetronome])
 
   return (
     <div className={`bg-gray-100 p-4 rounded-xl border border-gray-200 ${readOnly ? 'shadow-inner' : ''}`}>

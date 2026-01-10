@@ -40,12 +40,17 @@ export type Setlist = {
   created_at: string
 }
 
+export type Note = {
+  id: string
+  text: string
+}
+
 export type SetlistSong = {
   id: string
   setlist_id: string
   song_id: string
   position: number
   linked_to_next: boolean
-  notes: string
+  notes: string // JSON array of Note objects
   song?: Song
 }

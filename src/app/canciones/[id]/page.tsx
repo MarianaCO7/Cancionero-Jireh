@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import { supabase, Song, SetlistSong } from '@/lib/supabase'
+import { supabase, Song, SetlistSong, Note } from '@/lib/supabase'
 import SongViewer from '@/components/SongViewer'
 import SongEditor from '@/components/SongEditor'
 import Transposer from '@/components/Transposer'
 import Metronome from '@/components/Metronome'
+import NotesManager, { parseNotes, stringifyNotes } from '@/components/NotesManager'
 import { useReactToPrint } from 'react-to-print'
 
 export default function SongPage() {
@@ -73,6 +74,21 @@ export default function SongPage() {
       setCurrentSetlistSong(current || null)
     }
   }, [setlistSongs, params.id])
+
+  // Función para actualizar notas del setlist
+  async function updateSetlistNotes(notes: Note[]) {
+    if (!currentSetlistSong) return
+    const notesJson = stringifyNotes(notes)
+    await supabase
+      .from('setlist_songs')
+      .update({ notes: notesJson })
+      .eq('id', currentSetlistSong.id)
+    setCurrentSetlistSong({ ...currentSetlistSong, notes: notesJson })
+    // También actualizar en el array
+    setSetlistSongs(prev => prev.map(ss => 
+      ss.id === currentSetlistSong.id ? { ...ss, notes: notesJson } : ss
+    ))
+  }
 
   // Cerrar pantalla completa con Escape
   useEffect(() => {
@@ -237,10 +253,12 @@ export default function SongPage() {
           </div>
         )}
         
-        {/* Notas del setlist */}
-        {currentSetlistSong?.notes && (
+        {/* Notas del setlist en fullscreen */}
+        {currentSetlistSong && parseNotes(currentSetlistSong.notes || '').length > 0 && (
           <div className="bg-yellow-50 text-yellow-800 text-sm py-2 px-4">
-            📝 {currentSetlistSong.notes}
+            {parseNotes(currentSetlistSong.notes || '').map((note, i) => (
+              <span key={i} className="inline-block mr-3">📝 {note.text}</span>
+            ))}
           </div>
         )}
         
@@ -313,11 +331,12 @@ export default function SongPage() {
         </div>
       )}
       
-      {/* Notas del setlist */}
-      {fromSetlist && currentSetlistSong?.notes && (
-        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 py-3 px-4 rounded-lg">
-          📝 <strong>Notas:</strong> {currentSetlistSong.notes}
-        </div>
+      {/* Notas del setlist - ahora con NotesManager completo */}
+      {fromSetlist && currentSetlistSong && (
+        <NotesManager
+          notes={parseNotes(currentSetlistSong.notes || '')}
+          onUpdate={updateSetlistNotes}
+        />
       )}
 
       {/* Botón volver */}

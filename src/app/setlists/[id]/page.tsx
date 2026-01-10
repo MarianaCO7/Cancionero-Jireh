@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { supabase, Setlist, SetlistSong, Song } from '@/lib/supabase'
+import { supabase, Setlist, SetlistSong, Song, Note } from '@/lib/supabase'
 import { useReactToPrint } from 'react-to-print'
+import NotesManager, { parseNotes, stringifyNotes } from '@/components/NotesManager'
 
 export default function SetlistPage() {
   const params = useParams()
@@ -69,14 +70,15 @@ export default function SetlistPage() {
     }
   }
 
-  // Actualizar notas
-  async function updateNotes(id: string, notes: string) {
+  // Actualizar notas (ahora recibe array de Notes)
+  async function updateNotes(id: string, notes: Note[]) {
+    const notesJson = stringifyNotes(notes)
     await supabase
       .from('setlist_songs')
-      .update({ notes })
+      .update({ notes: notesJson })
       .eq('id', id)
     setSetlistSongs(prev => prev.map(ss => 
-      ss.id === id ? { ...ss, notes } : ss
+      ss.id === id ? { ...ss, notes: notesJson } : ss
     ))
   }
 
@@ -241,21 +243,21 @@ export default function SetlistPage() {
                     </button>
                   </div>
                   
-                  {/* Campo de notas */}
+                  {/* Campo de notas - ahora con NotesManager compacto */}
                   <div className="mt-2 ml-14 print:hidden">
-                    <input
-                      type="text"
-                      placeholder="📝 Notas para esta canción..."
-                      value={ss.notes || ''}
-                      onChange={(e) => updateNotes(ss.id, e.target.value)}
-                      className="w-full text-sm px-2 py-1 bg-white border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-indigo-300"
+                    <NotesManager
+                      notes={parseNotes(ss.notes || '')}
+                      onUpdate={(notes) => updateNotes(ss.id, notes)}
+                      compact
                     />
                   </div>
                   {/* Mostrar notas en print si hay */}
-                  {ss.notes && (
-                    <p className="hidden print:block mt-1 ml-14 text-sm text-gray-600 italic">
-                      📝 {ss.notes}
-                    </p>
+                  {parseNotes(ss.notes || '').length > 0 && (
+                    <div className="hidden print:block mt-1 ml-14 text-sm text-gray-600 italic">
+                      {parseNotes(ss.notes || '').map((note, i) => (
+                        <p key={i}>📝 {note.text}</p>
+                      ))}
+                    </div>
                   )}
                 </li>
                 
