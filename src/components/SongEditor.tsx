@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Song, TEMPOS, DEFAULT_CATEGORIES } from '@/lib/supabase'
+import Metronome from '@/components/Metronome'
 
 const KEYS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 
@@ -12,6 +13,7 @@ type Props = {
 }
 
 export default function SongEditor({ song, onSave, onCancel }: Props) {
+  const [showMetronome, setShowMetronome] = useState(false)
   const [form, setForm] = useState({
     title: song.title,
     author: song.author || '',
@@ -21,6 +23,7 @@ export default function SongEditor({ song, onSave, onCancel }: Props) {
     key_female: song.key_female,
     tempo: song.tempo || 'media',
     category: song.category || '',
+    bpm: song.bpm,
   })
   const [customCategory, setCustomCategory] = useState('')
   const [showCustomInput, setShowCustomInput] = useState(false)
@@ -140,6 +143,48 @@ export default function SongEditor({ song, onSave, onCancel }: Props) {
             ))}
           </select>
         </div>
+      </div>
+
+      {/* BPM / Metrónomo */}
+      <div className="border rounded-lg p-4 bg-gray-50">
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-sm font-medium text-gray-700">
+            🥁 BPM
+          </label>
+          <button
+            type="button"
+            onClick={() => setShowMetronome(!showMetronome)}
+            className="text-sm text-indigo-600 hover:text-indigo-800"
+          >
+            {showMetronome ? 'Ocultar metrónomo' : 'Usar metrónomo'}
+          </button>
+        </div>
+        
+        {!showMetronome ? (
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              value={form.bpm || ''}
+              onChange={(e) => setForm({ ...form, bpm: e.target.value ? parseInt(e.target.value) : null })}
+              className="w-24 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 text-black"
+              placeholder="120"
+              min={40}
+              max={240}
+            />
+            <span className="text-sm text-gray-500">BPM</span>
+            {form.bpm && (
+              <span className="text-sm text-green-600">✓</span>
+            )}
+          </div>
+        ) : (
+          <Metronome
+            initialBpm={form.bpm}
+            onSave={(bpm) => {
+              setForm({ ...form, bpm })
+              setShowMetronome(false)
+            }}
+          />
+        )}
       </div>
 
       {/* Instrucciones */}

@@ -15,6 +15,7 @@ export type Song = {
   key_female: string
   tempo: string
   category: string
+  bpm: number | null
   created_at: string
 }
 

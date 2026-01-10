@@ -12,6 +12,7 @@ CREATE TABLE songs (
   key_female TEXT NOT NULL DEFAULT 'B',
   tempo TEXT DEFAULT 'media',
   category TEXT DEFAULT '',
+  bpm INTEGER DEFAULT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

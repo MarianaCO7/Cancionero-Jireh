@@ -6,6 +6,7 @@ import { supabase, Song } from '@/lib/supabase'
 import SongViewer from '@/components/SongViewer'
 import SongEditor from '@/components/SongEditor'
 import Transposer from '@/components/Transposer'
+import Metronome from '@/components/Metronome'
 import { useReactToPrint } from 'react-to-print'
 
 export default function SongPage() {
@@ -18,6 +19,7 @@ export default function SongPage() {
   const [song, setSong] = useState<Song | null>(null)
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
+  const [showMetronome, setShowMetronome] = useState(false)
   const [fullscreen, setFullscreen] = useState(false)
   const [fontSize, setFontSize] = useState(16)
   const [transposeSemitones, setTransposeSemitones] = useState(0)
@@ -182,11 +184,28 @@ export default function SongPage() {
                 {song.category}
               </span>
             )}
+            {song.bpm && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-gray-800 text-white">
+                🥁 {song.bpm} BPM
+              </span>
+            )}
           </div>
         </div>
         <div className="flex gap-2 flex-wrap">
           {!editing && (
             <>
+              {song.bpm && (
+                <button
+                  onClick={() => setShowMetronome(!showMetronome)}
+                  className={`px-3 py-1 text-sm rounded transition ${
+                    showMetronome 
+                      ? 'bg-gray-800 text-white' 
+                      : 'bg-gray-200 hover:bg-gray-300'
+                  }`}
+                >
+                  🥁 Metrónomo
+                </button>
+              )}
               <button
                 onClick={() => setFullscreen(true)}
                 className="px-3 py-1 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700 transition"
@@ -225,6 +244,11 @@ export default function SongPage() {
             currentSemitones={transposeSemitones}
             onChange={setTransposeSemitones}
           />
+          
+          {/* Metrónomo */}
+          {showMetronome && song.bpm && (
+            <Metronome initialBpm={song.bpm} readOnly />
+          )}
           
           {/* Controles de zoom */}
           <div className="flex items-center gap-2 text-sm text-gray-600">
