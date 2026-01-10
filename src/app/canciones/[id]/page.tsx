@@ -14,6 +14,8 @@ export default function SongPage() {
   const [song, setSong] = useState<Song | null>(null)
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
+  const [fullscreen, setFullscreen] = useState(false)
+  const [fontSize, setFontSize] = useState(16)
   const [transposeSemitones, setTransposeSemitones] = useState(0)
   const printRef = useRef<HTMLDivElement>(null)
 
@@ -25,6 +27,15 @@ export default function SongPage() {
   useEffect(() => {
     loadSong()
   }, [params.id])
+
+  // Cerrar pantalla completa con Escape
+  useEffect(() => {
+    function handleEscape(e: KeyboardEvent) {
+      if (e.key === 'Escape') setFullscreen(false)
+    }
+    window.addEventListener('keydown', handleEscape)
+    return () => window.removeEventListener('keydown', handleEscape)
+  }, [])
 
   async function loadSong() {
     const { data, error } = await supabase
@@ -39,17 +50,19 @@ export default function SongPage() {
     setLoading(false)
   }
 
-  async function handleSave(content: string) {
+  async function handleSave(updates: Partial<Song>) {
     if (!song) return
     
     const { error } = await supabase
       .from('songs')
-      .update({ content })
+      .update(updates)
       .eq('id', song.id)
     
     if (!error) {
-      setSong({ ...song, content })
+      setSong({ ...song, ...updates })
       setEditing(false)
+    } else {
+      alert('Error al guardar: ' + error.message)
     }
   }
 
@@ -74,16 +87,92 @@ export default function SongPage() {
     return <div className="text-center py-10 text-red-500">Canción no encontrada</div>
   }
 
+  // Modo pantalla completa
+  if (fullscreen) {
+    return (
+      <div className="fixed inset-0 bg-white z-50 overflow-auto">
+        {/* Barra de controles */}
+        <div className="sticky top-0 bg-white border-b shadow-sm p-3 flex items-center justify-between z-10">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setFullscreen(false)}
+              className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200"
+            >
+              ✕
+            </button>
+            <span className="font-bold text-gray-800 truncate max-w-[150px]">{song.title}</span>
+          </div>
+          
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setFontSize(Math.max(12, fontSize - 2))}
+              className="w-10 h-10 rounded-lg bg-gray-100 hover:bg-gray-200 text-lg font-bold"
+            >
+              A-
+            </button>
+            <span className="w-10 text-center text-sm text-gray-600">{fontSize}</span>
+            <button
+              onClick={() => setFontSize(Math.min(32, fontSize + 2))}
+              className="w-10 h-10 rounded-lg bg-gray-100 hover:bg-gray-200 text-lg font-bold"
+            >
+              A+
+            </button>
+          </div>
+          
+          <Transposer
+            originalKey={song.original_key}
+            keyMale={song.key_male}
+            keyFemale={song.key_female}
+            currentSemitones={transposeSemitones}
+            onChange={setTransposeSemitones}
+            compact
+          />
+        </div>
+        
+        {/* Contenido */}
+        <div className="p-4" style={{ fontSize: `${fontSize}px` }}>
+          <SongViewer
+            content={song.content}
+            originalKey={song.original_key}
+            transposeSemitones={transposeSemitones}
+          />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{song.title}</h1>
           {song.author && <p className="text-indigo-600 font-medium">{song.author}</p>}
+          <div className="flex gap-2 mt-1">
+            {song.tempo && (
+              <span className={`text-xs px-2 py-0.5 rounded-full ${
+                song.tempo === 'rapida' ? 'bg-orange-100 text-orange-700' :
+                song.tempo === 'lenta' ? 'bg-blue-100 text-blue-700' :
+                'bg-gray-100 text-gray-600'
+              }`}>
+                {song.tempo === 'rapida' ? '🏃 Rápida' : song.tempo === 'lenta' ? '🧘 Lenta' : '🚶 Media'}
+              </span>
+            )}
+            {song.category && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
+                {song.category}
+              </span>
+            )}
+          </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {!editing && (
             <>
+              <button
+                onClick={() => setFullscreen(true)}
+                className="px-3 py-1 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700 transition"
+              >
+                📱 Pantalla Completa
+              </button>
               <button
                 onClick={() => handlePrint()}
                 className="px-3 py-1 text-sm bg-gray-200 rounded hover:bg-gray-300 transition"
@@ -108,19 +197,39 @@ export default function SongPage() {
       </div>
 
       {!editing && (
-        <Transposer
-          originalKey={song.original_key}
-          keyMale={song.key_male}
-          keyFemale={song.key_female}
-          currentSemitones={transposeSemitones}
-          onChange={setTransposeSemitones}
-        />
+        <>
+          <Transposer
+            originalKey={song.original_key}
+            keyMale={song.key_male}
+            keyFemale={song.key_female}
+            currentSemitones={transposeSemitones}
+            onChange={setTransposeSemitones}
+          />
+          
+          {/* Controles de zoom */}
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <span>Tamaño:</span>
+            <button
+              onClick={() => setFontSize(Math.max(12, fontSize - 2))}
+              className="w-8 h-8 rounded bg-gray-100 hover:bg-gray-200 font-bold"
+            >
+              -
+            </button>
+            <span className="w-8 text-center">{fontSize}</span>
+            <button
+              onClick={() => setFontSize(Math.min(32, fontSize + 2))}
+              className="w-8 h-8 rounded bg-gray-100 hover:bg-gray-200 font-bold"
+            >
+              +
+            </button>
+          </div>
+        </>
       )}
 
-      <div ref={printRef} className="bg-white p-6 rounded-lg shadow">
+      <div ref={printRef} className="bg-white p-6 rounded-lg shadow" style={{ fontSize: `${fontSize}px` }}>
         {editing ? (
           <SongEditor
-            initialContent={song.content}
+            song={song}
             onSave={handleSave}
             onCancel={() => setEditing(false)}
           />
