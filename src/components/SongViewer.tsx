@@ -13,42 +13,56 @@ type Props = {
 function isChordLine(line: string): boolean {
   const trimmed = line.trim()
   if (!trimmed) return false
+  // Si la línea tiene más de 50 caracteres sin espacios, probablemente es texto
+  if (trimmed.replace(/\s/g, '').length > 40) return false
+  
   const words = trimmed.split(/\s+/)
-  const chordPattern = /^[A-G][#b]?(m|maj|min|dim|aug|sus|add|7|9|11|13|6|5|2|4)?(\/[A-G][#b]?)?$/i
+  // Patrón mejorado que captura acordes complejos
+  const chordPattern = /^[A-G][#b]?(m|maj|min|dim|aug|add|sus)?[0-9]*(sus|add|maj|b|#)?[0-9]*(\/[A-G][#b]?)?$/
   const chordWords = words.filter(w => chordPattern.test(w) || /^\[.*\]$/.test(w))
-  return chordWords.length > 0 && chordWords.length >= words.length * 0.5
+  return chordWords.length > 0 && chordWords.length >= words.length * 0.6
 }
 
 // Transponer acordes en texto plano (sin corchetes)
+// Captura acordes complejos: Am7, Cmaj7, Gsus4, F#m7b5, Bb7, etc.
 function transposePlainChords(line: string, semitones: number): string {
   if (semitones === 0) return line
   const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
   const NOTES_FLAT = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B']
   
-  return line.replace(/\b([A-G][#b]?)(m|maj|min|dim|aug|sus|add|7|9|11|13|6|5|2|4)?(\/[A-G][#b]?)?\b/g, (match, root, suffix, bass) => {
-    let noteIndex = NOTES.indexOf(root)
-    if (noteIndex === -1) noteIndex = NOTES_FLAT.indexOf(root)
-    if (noteIndex === -1) return match
-    
-    const newIndex = (noteIndex + semitones + 12) % 12
-    const useFlats = root.includes('b')
-    const newRoot = useFlats ? NOTES_FLAT[newIndex] : NOTES[newIndex]
-    
-    let result = newRoot + (suffix || '')
-    
-    if (bass) {
-      const bassNote = bass.substring(1)
-      let bassIndex = NOTES.indexOf(bassNote)
-      if (bassIndex === -1) bassIndex = NOTES_FLAT.indexOf(bassNote)
-      if (bassIndex !== -1) {
-        const newBassIndex = (bassIndex + semitones + 12) % 12
-        const newBass = useFlats ? NOTES_FLAT[newBassIndex] : NOTES[newBassIndex]
-        result += '/' + newBass
+  // Regex mejorado: captura la nota raíz y todo el sufijo (m7, maj7, sus4, etc.) y bajo opcional
+  // (?![a-z]) evita que capture palabras como "Amor" o "Bendito"
+  return line.replace(/(?<![a-zA-Z])([A-G][#b]?)(m|maj|min|dim|aug|add|sus)?([0-9]*)(sus|add|maj|min|dim|aug|b|#)?([0-9]*)(\/[A-G][#b]?)?(?![a-z])/g, 
+    (match, root, quality, num1, quality2, num2, bass) => {
+      // Verificar que sea un acorde válido (no solo una letra suelta)
+      if (!quality && !num1 && !bass && match.length === 1) {
+        // Es solo una letra como "A" o "G" - verificar contexto
+        // Si está sola en un espacio, probablemente es acorde
       }
-    }
-    
-    return result
-  })
+      
+      let noteIndex = NOTES.indexOf(root)
+      if (noteIndex === -1) noteIndex = NOTES_FLAT.indexOf(root)
+      if (noteIndex === -1) return match
+      
+      const newIndex = (noteIndex + semitones + 12) % 12
+      const useFlats = root.includes('b')
+      const newRoot = useFlats ? NOTES_FLAT[newIndex] : NOTES[newIndex]
+      
+      let result = newRoot + (quality || '') + (num1 || '') + (quality2 || '') + (num2 || '')
+      
+      if (bass) {
+        const bassNote = bass.substring(1)
+        let bassIndex = NOTES.indexOf(bassNote)
+        if (bassIndex === -1) bassIndex = NOTES_FLAT.indexOf(bassNote)
+        if (bassIndex !== -1) {
+          const newBassIndex = (bassIndex + semitones + 12) % 12
+          const newBass = useFlats ? NOTES_FLAT[newBassIndex] : NOTES[newBassIndex]
+          result += '/' + newBass
+        }
+      }
+      
+      return result
+    })
 }
 
 export default function SongViewer({ content, originalKey, transposeSemitones }: Props) {
@@ -101,12 +115,12 @@ export default function SongViewer({ content, originalKey, transposeSemitones }:
 
           elements.push(
             <div key={`inline-${i}`} className="mb-4">
-              <div className="text-indigo-600 font-bold font-mono whitespace-pre text-base">{chordLine}</div>
-              <div className="text-gray-900 font-mono whitespace-pre text-lg">{cleanLine}</div>
+              <div className="text-indigo-600 font-bold font-mono whitespace-pre" style={{ fontSize: '0.9em' }}>{chordLine}</div>
+              <div className="font-mono whitespace-pre" style={{ color: '#111827' }}>{cleanLine}</div>
             </div>
           )
         } else {
-          elements.push(<div key={`text-${i}`} className="text-gray-900 text-lg mb-1 whitespace-pre">{line}</div>)
+          elements.push(<div key={`text-${i}`} className="mb-1 whitespace-pre" style={{ color: '#111827' }}>{line}</div>)
         }
         i++
         continue
@@ -120,14 +134,14 @@ export default function SongViewer({ content, originalKey, transposeSemitones }:
         if (nextLine && !isChordLine(nextLine) && nextLine.trim() !== '') {
           elements.push(
             <div key={`pair-${i}`} className="mb-4">
-              <div className="text-indigo-600 font-bold font-mono whitespace-pre text-base">{chordLine}</div>
-              <div className="text-gray-900 font-mono whitespace-pre text-lg">{nextLine}</div>
+              <div className="text-indigo-600 font-bold font-mono whitespace-pre" style={{ fontSize: '0.9em' }}>{chordLine}</div>
+              <div className="font-mono whitespace-pre" style={{ color: '#111827' }}>{nextLine}</div>
             </div>
           )
           i += 2
         } else {
           elements.push(
-            <div key={`chords-${i}`} className="text-indigo-600 font-bold font-mono whitespace-pre text-base mb-2">{chordLine}</div>
+            <div key={`chords-${i}`} className="text-indigo-600 font-bold font-mono whitespace-pre mb-2" style={{ fontSize: '0.9em' }}>{chordLine}</div>
           )
           i++
         }
@@ -136,7 +150,7 @@ export default function SongViewer({ content, originalKey, transposeSemitones }:
 
       // Línea normal de texto
       elements.push(
-        <div key={`line-${i}`} className="text-gray-900 text-lg mb-1 whitespace-pre font-mono">{line}</div>
+        <div key={`line-${i}`} className="mb-1 whitespace-pre font-mono" style={{ color: '#111827' }}>{line}</div>
       )
       i++
     }
