@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { supabase, Song, SetlistSong } from '@/lib/supabase'
 import SongViewer from '@/components/SongViewer'
@@ -15,7 +15,6 @@ export default function SongPage() {
   const searchParams = useSearchParams()
   const fromSetlist = searchParams.get('from') === 'setlist'
   const setlistId = searchParams.get('setlistId')
-  const positionParam = searchParams.get('position')
   
   const [song, setSong] = useState<Song | null>(null)
   const [loading, setLoading] = useState(true)
@@ -28,7 +27,6 @@ export default function SongPage() {
   
   // Estado para navegación del setlist
   const [setlistSongs, setSetlistSongs] = useState<SetlistSong[]>([])
-  const [currentPosition, setCurrentPosition] = useState(0)
   const [currentSetlistSong, setCurrentSetlistSong] = useState<SetlistSong | null>(null)
 
   const handlePrint = useReactToPrint({
@@ -36,19 +34,37 @@ export default function SongPage() {
     documentTitle: song?.title || 'Canción',
   })
 
+  const loadSong = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('songs')
+      .select('*')
+      .eq('id', params.id)
+      .single()
+    
+    if (!error && data) {
+      setSong(data)
+    }
+    setLoading(false)
+  }, [params.id])
+
+  const loadSetlistSongs = useCallback(async () => {
+    if (!setlistId) return
+    const { data } = await supabase
+      .from('setlist_songs')
+      .select('*, song:songs(*)')
+      .eq('setlist_id', setlistId)
+      .order('position')
+    if (data) {
+      setSetlistSongs(data)
+    }
+  }, [setlistId])
+
   useEffect(() => {
     loadSong()
     if (fromSetlist && setlistId) {
       loadSetlistSongs()
     }
-  }, [params.id, setlistId])
-
-  // Actualizar posición cuando cambia
-  useEffect(() => {
-    if (positionParam !== null) {
-      setCurrentPosition(parseInt(positionParam))
-    }
-  }, [positionParam])
+  }, [loadSong, loadSetlistSongs, fromSetlist, setlistId])
 
   // Encontrar la canción actual en el setlist
   useEffect(() => {
@@ -75,18 +91,6 @@ export default function SongPage() {
     }
   }
 
-  async function loadSetlistSongs() {
-    if (!setlistId) return
-    const { data } = await supabase
-      .from('setlist_songs')
-      .select('*, song:songs(*)')
-      .eq('setlist_id', setlistId)
-      .order('position')
-    if (data) {
-      setSetlistSongs(data)
-    }
-  }
-
   function navigateTo(direction: 'prev' | 'next') {
     if (!fromSetlist || !setlistId || setlistSongs.length === 0) return
     
@@ -100,31 +104,27 @@ export default function SongPage() {
     router.push(`/canciones/${nextSong.song_id}?from=setlist&setlistId=${setlistId}&position=${newIdx}`)
   }
 
-  const canNavigatePrev = fromSetlist && setlistSongs.length > 0 && 
-    setlistSongs.findIndex(ss => ss.song_id === params.id) > 0
-  const canNavigateNext = fromSetlist && setlistSongs.length > 0 && 
-    setlistSongs.findIndex(ss => ss.song_id === params.id) < setlistSongs.length - 1
+  const canNavigatePrev = useMemo(() => fromSetlist && setlistSongs.length > 0 && 
+    setlistSongs.findIndex(ss => ss.song_id === params.id) > 0, [fromSetlist, setlistSongs, params.id])
+
+  const canNavigateNext = useMemo(() => fromSetlist && setlistSongs.length > 0 && 
+    setlistSongs.findIndex(ss => ss.song_id === params.id) < setlistSongs.length - 1, [fromSetlist, setlistSongs, params.id])
   
   // Verificar si la canción anterior está enganchada con esta
-  const prevSong = setlistSongs[setlistSongs.findIndex(ss => ss.song_id === params.id) - 1]
-  const isLinkedFromPrev = prevSong?.linked_to_next === true
+  const prevSong = useMemo(() => {
+    const idx = setlistSongs.findIndex(ss => ss.song_id === params.id)
+    return idx > 0 ? setlistSongs[idx - 1] : null
+  }, [setlistSongs, params.id])
+
+  const isLinkedFromPrev = useMemo(() => prevSong?.linked_to_next === true, [prevSong])
   
   // Verificar si esta canción está enganchada con la siguiente
-  const isLinkedToNext = currentSetlistSong?.linked_to_next === true
-  const nextSong = setlistSongs[setlistSongs.findIndex(ss => ss.song_id === params.id) + 1]
+  const isLinkedToNext = useMemo(() => currentSetlistSong?.linked_to_next === true, [currentSetlistSong])
 
-  async function loadSong() {
-    const { data, error } = await supabase
-      .from('songs')
-      .select('*')
-      .eq('id', params.id)
-      .single()
-    
-    if (!error && data) {
-      setSong(data)
-    }
-    setLoading(false)
-  }
+  const nextSong = useMemo(() => {
+    const idx = setlistSongs.findIndex(ss => ss.song_id === params.id)
+    return (idx !== -1 && idx < setlistSongs.length - 1) ? setlistSongs[idx + 1] : null
+  }, [setlistSongs, params.id])
 
   async function handleSave(updates: Partial<Song>) {
     if (!song) return
@@ -228,12 +228,12 @@ export default function SongPage() {
         {/* Indicador de enganche */}
         {isLinkedFromPrev && (
           <div className="bg-indigo-100 text-indigo-700 text-sm py-2 px-4 text-center">
-            🔗 Viene enganchada de "{prevSong?.song?.title}"
+            🔗 Viene enganchada de &quot;{prevSong?.song?.title}&quot;
           </div>
         )}
         {isLinkedToNext && (
           <div className="bg-indigo-100 text-indigo-700 text-sm py-2 px-4 text-center">
-            🔗 Continúa con "{nextSong?.song?.title}" (sin parar)
+            🔗 Continúa con &quot;{nextSong?.song?.title}&quot; (sin parar)
           </div>
         )}
         
@@ -304,12 +304,12 @@ export default function SongPage() {
       {/* Indicadores de enganche */}
       {fromSetlist && isLinkedFromPrev && (
         <div className="bg-indigo-100 text-indigo-700 text-sm py-2 px-4 rounded-lg text-center">
-          🔗 Viene enganchada de "{prevSong?.song?.title}"
+          🔗 Viene enganchada de &quot;{prevSong?.song?.title}&quot;
         </div>
       )}
       {fromSetlist && isLinkedToNext && (
         <div className="bg-indigo-100 text-indigo-700 text-sm py-2 px-4 rounded-lg text-center">
-          🔗 Continúa con "{nextSong?.song?.title}" sin parar
+          🔗 Continúa con &quot;{nextSong?.song?.title}&quot; sin parar
         </div>
       )}
       
@@ -348,27 +348,26 @@ export default function SongPage() {
               </span>
             )}
             {song.bpm && (
-              <span className="text-xs px-2 py-0.5 rounded-full bg-gray-800 text-white">
-                🥁 {song.bpm} BPM
-              </span>
+              <button
+                onClick={() => setShowMetronome(!showMetronome)}
+                className={`flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full transition-all ${
+                  showMetronome 
+                    ? 'bg-indigo-600 text-white shadow-lg' 
+                    : 'bg-gray-800 text-white hover:bg-gray-700'
+                }`}
+                title={showMetronome ? 'Detener metrónomo' : 'Iniciar metrónomo'}
+              >
+                🥁 {song.bpm} BPM 
+                <span className="ml-1 w-4 h-4 flex items-center justify-center bg-white/20 rounded-full">
+                  {showMetronome ? '✕' : '▶'}
+                </span>
+              </button>
             )}
           </div>
         </div>
         <div className="flex gap-2 flex-wrap">
           {!editing && (
             <>
-              {song.bpm && (
-                <button
-                  onClick={() => setShowMetronome(!showMetronome)}
-                  className={`px-3 py-1 text-sm rounded transition ${
-                    showMetronome 
-                      ? 'bg-gray-800 text-white' 
-                      : 'bg-gray-200 hover:bg-gray-300'
-                  }`}
-                >
-                  🥁 Metrónomo
-                </button>
-              )}
               <button
                 onClick={() => setFullscreen(true)}
                 className="px-3 py-1 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700 transition"
@@ -400,6 +399,13 @@ export default function SongPage() {
 
       {!editing && (
         <>
+          {/* Metrónomo compacto */}
+          {showMetronome && song.bpm && (
+            <div className="animate-in slide-in-from-top-2 duration-300">
+              <Metronome initialBpm={song.bpm} readOnly />
+            </div>
+          )}
+
           <Transposer
             originalKey={song.original_key}
             keyMale={song.key_male}
@@ -407,11 +413,6 @@ export default function SongPage() {
             currentSemitones={transposeSemitones}
             onChange={setTransposeSemitones}
           />
-          
-          {/* Metrónomo */}
-          {showMetronome && song.bpm && (
-            <Metronome initialBpm={song.bpm} readOnly />
-          )}
           
           {/* Controles de zoom */}
           <div className="flex items-center gap-2 text-sm text-gray-600">

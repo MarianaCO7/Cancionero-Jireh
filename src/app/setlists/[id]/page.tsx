@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase, Setlist, SetlistSong, Song } from '@/lib/supabase'
 import { useReactToPrint } from 'react-to-print'
@@ -22,11 +22,7 @@ export default function SetlistPage() {
     documentTitle: setlist?.name || 'Setlist',
   })
 
-  useEffect(() => {
-    loadData()
-  }, [params.id])
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     const [setlistRes, songsRes, allSongsRes] = await Promise.all([
       supabase.from('setlists').select('*').eq('id', params.id).single(),
       supabase.from('setlist_songs').select('*, song:songs(*)').eq('setlist_id', params.id).order('position'),
@@ -37,7 +33,11 @@ export default function SetlistPage() {
     if (songsRes.data) setSetlistSongs(songsRes.data)
     if (allSongsRes.data) setAllSongs(allSongsRes.data)
     setLoading(false)
-  }
+  }, [params.id])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   async function addSongToSetlist(songId: string) {
     const position = setlistSongs.length + 1

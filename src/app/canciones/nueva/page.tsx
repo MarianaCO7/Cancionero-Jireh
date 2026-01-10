@@ -213,7 +213,7 @@ export default function NewSongPage() {
             </div>
           ) : (
             <Metronome
-              initialBpm={form.bpm}
+              initialBpm={form.bpm ?? undefined}
               onSave={(bpm) => {
                 setForm({ ...form, bpm })
                 setShowMetronome(false)

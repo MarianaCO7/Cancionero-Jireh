@@ -178,7 +178,7 @@ export default function SongEditor({ song, onSave, onCancel }: Props) {
           </div>
         ) : (
           <Metronome
-            initialBpm={form.bpm}
+            initialBpm={form.bpm ?? undefined}
             onSave={(bpm) => {
               setForm({ ...form, bpm })
               setShowMetronome(false)
