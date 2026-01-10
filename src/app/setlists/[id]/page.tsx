@@ -12,6 +12,7 @@ export default function SetlistPage() {
   const [setlistSongs, setSetlistSongs] = useState<SetlistSong[]>([])
   const [allSongs, setAllSongs] = useState<Song[]>([])
   const [showAddSong, setShowAddSong] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(true)
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
   const printRef = useRef<HTMLDivElement>(null)
@@ -219,26 +220,68 @@ export default function SetlistPage() {
       <div className="print:hidden">
         {showAddSong ? (
           <div className="bg-white p-4 rounded-lg shadow space-y-3">
-            <h3 className="font-semibold">Agregar canción</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold">Agregar canción</h3>
+              <button 
+                onClick={() => { setShowAddSong(false); setSearchQuery(''); }} 
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
+            </div>
+            
+            {/* Buscador */}
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="🔍 Buscar canción..."
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 text-black"
+              autoFocus
+            />
+            
             {songsNotInSetlist.length === 0 ? (
               <p className="text-gray-500">Todas las canciones ya están en el setlist</p>
             ) : (
-              <ul className="max-h-60 overflow-y-auto divide-y">
-                {songsNotInSetlist.map(song => (
-                  <li key={song.id}>
-                    <button
-                      onClick={() => addSongToSetlist(song.id)}
-                      className="w-full text-left px-3 py-2 hover:bg-gray-50"
-                    >
-                      {song.title} <span className="text-gray-400">({song.original_key})</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              <>
+                {/* Lista filtrada */}
+                {(() => {
+                  const filtered = songsNotInSetlist.filter(song => 
+                    song.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    (song.author && song.author.toLowerCase().includes(searchQuery.toLowerCase()))
+                  )
+                  
+                  if (filtered.length === 0) {
+                    return <p className="text-gray-500 text-center py-2">No se encontraron canciones</p>
+                  }
+                  
+                  return (
+                    <ul className="max-h-60 overflow-y-auto divide-y border rounded-lg">
+                      {filtered.map(song => (
+                        <li key={song.id}>
+                          <button
+                            onClick={() => {
+                              addSongToSetlist(song.id)
+                              setSearchQuery('')
+                            }}
+                            className="w-full text-left px-3 py-2 hover:bg-indigo-50 flex justify-between items-center"
+                          >
+                            <div>
+                              <span className="font-medium">{song.title}</span>
+                              {song.author && <span className="text-sm text-gray-500 ml-2">- {song.author}</span>}
+                            </div>
+                            <span className="text-sm text-gray-400">{song.original_key}</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )
+                })()}
+                <p className="text-xs text-gray-400 text-center">
+                  {songsNotInSetlist.length} canciones disponibles
+                </p>
+              </>
             )}
-            <button onClick={() => setShowAddSong(false)} className="text-gray-500 hover:text-gray-700">
-              Cancelar
-            </button>
           </div>
         ) : (
           <button
