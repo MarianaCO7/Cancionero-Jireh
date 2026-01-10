@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { supabase, Setlist, SetlistSong, Song } from '@/lib/supabase'
 import { useReactToPrint } from 'react-to-print'
 
@@ -14,6 +13,7 @@ export default function SetlistPage() {
   const [allSongs, setAllSongs] = useState<Song[]>([])
   const [showAddSong, setShowAddSong] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
   const printRef = useRef<HTMLDivElement>(null)
 
   const handlePrint = useReactToPrint({
@@ -53,6 +53,73 @@ export default function SetlistPage() {
   async function removeSongFromSetlist(id: string) {
     const { error } = await supabase.from('setlist_songs').delete().eq('id', id)
     if (!error) loadData()
+  }
+
+  // Drag and drop handlers
+  function handleDragStart(index: number) {
+    setDraggedIndex(index)
+  }
+
+  function handleDragOver(e: React.DragEvent, index: number) {
+    e.preventDefault()
+    if (draggedIndex === null || draggedIndex === index) return
+    
+    // Reordenar visualmente mientras se arrastra
+    const newSongs = [...setlistSongs]
+    const draggedItem = newSongs[draggedIndex]
+    newSongs.splice(draggedIndex, 1)
+    newSongs.splice(index, 0, draggedItem)
+    setSetlistSongs(newSongs)
+    setDraggedIndex(index)
+  }
+
+  async function handleDragEnd() {
+    if (draggedIndex === null) return
+    setDraggedIndex(null)
+    
+    // Guardar nuevo orden en la base de datos
+    const updates = setlistSongs.map((ss, index) => ({
+      id: ss.id,
+      position: index + 1
+    }))
+    
+    for (const update of updates) {
+      await supabase
+        .from('setlist_songs')
+        .update({ position: update.position })
+        .eq('id', update.id)
+    }
+  }
+
+  // Mover con botones (alternativa a drag)
+  async function moveUp(index: number) {
+    if (index === 0) return
+    const newSongs = [...setlistSongs]
+    const temp = newSongs[index]
+    newSongs[index] = newSongs[index - 1]
+    newSongs[index - 1] = temp
+    setSetlistSongs(newSongs)
+    
+    // Guardar en DB
+    await Promise.all([
+      supabase.from('setlist_songs').update({ position: index }).eq('id', newSongs[index].id),
+      supabase.from('setlist_songs').update({ position: index + 1 }).eq('id', newSongs[index - 1].id)
+    ])
+  }
+
+  async function moveDown(index: number) {
+    if (index === setlistSongs.length - 1) return
+    const newSongs = [...setlistSongs]
+    const temp = newSongs[index]
+    newSongs[index] = newSongs[index + 1]
+    newSongs[index + 1] = temp
+    setSetlistSongs(newSongs)
+    
+    // Guardar en DB
+    await Promise.all([
+      supabase.from('setlist_songs').update({ position: index + 2 }).eq('id', newSongs[index + 1].id),
+      supabase.from('setlist_songs').update({ position: index + 1 }).eq('id', newSongs[index].id)
+    ])
   }
 
   async function handleDelete() {
@@ -98,14 +165,43 @@ export default function SetlistPage() {
         ) : (
           <ol className="space-y-2">
             {setlistSongs.map((ss, index) => (
-              <li key={ss.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              <li 
+                key={ss.id} 
+                draggable
+                onDragStart={() => handleDragStart(index)}
+                onDragOver={(e) => handleDragOver(e, index)}
+                onDragEnd={handleDragEnd}
+                className={`flex items-center justify-between p-3 bg-gray-50 rounded-lg cursor-move ${
+                  draggedIndex === index ? 'opacity-50 border-2 border-indigo-400' : ''
+                }`}
+              >
                 <div className="flex items-center gap-3">
+                  {/* Botones de orden */}
+                  <div className="flex flex-col gap-0.5 print:hidden">
+                    <button
+                      onClick={() => moveUp(index)}
+                      disabled={index === 0}
+                      className="w-5 h-5 text-xs bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-30"
+                    >
+                      ▲
+                    </button>
+                    <button
+                      onClick={() => moveDown(index)}
+                      disabled={index === setlistSongs.length - 1}
+                      className="w-5 h-5 text-xs bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-30"
+                    >
+                      ▼
+                    </button>
+                  </div>
                   <span className="w-6 h-6 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-sm font-medium">
                     {index + 1}
                   </span>
-                  <Link href={`/canciones/${ss.song_id}`} className="font-medium hover:text-indigo-600">
+                  <a 
+                    href={`/canciones/${ss.song_id}?from=setlist&setlistId=${params.id}`}
+                    className="font-medium hover:text-indigo-600"
+                  >
                     {ss.song?.title}
-                  </Link>
+                  </a>
                   <span className="text-sm text-gray-400">{ss.song?.original_key}</span>
                 </div>
                 <button

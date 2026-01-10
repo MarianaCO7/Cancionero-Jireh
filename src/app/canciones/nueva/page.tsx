@@ -20,6 +20,7 @@ export default function NewSongPage() {
     category: '',
   })
   const [customCategory, setCustomCategory] = useState('')
+  const [showCustomInput, setShowCustomInput] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -95,13 +96,16 @@ export default function NewSongPage() {
               Categoría
             </label>
             <select
-              value={form.category}
+              value={showCustomInput ? '__custom__' : form.category}
               onChange={(e) => {
                 if (e.target.value === '__custom__') {
+                  setShowCustomInput(true)
                   setCustomCategory('')
+                  setForm({ ...form, category: '' })
                 } else {
-                  setForm({ ...form, category: e.target.value })
+                  setShowCustomInput(false)
                   setCustomCategory('')
+                  setForm({ ...form, category: e.target.value })
                 }
               }}
               className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 text-black bg-white"
@@ -112,7 +116,7 @@ export default function NewSongPage() {
               ))}
               <option value="__custom__">+ Otra...</option>
             </select>
-            {(form.category === '__custom__' || customCategory) && (
+            {showCustomInput && (
               <input
                 type="text"
                 value={customCategory}
@@ -122,6 +126,7 @@ export default function NewSongPage() {
                 }}
                 className="w-full mt-2 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 text-black"
                 placeholder="Escribe la categoría..."
+                autoFocus
               />
             )}
           </div>

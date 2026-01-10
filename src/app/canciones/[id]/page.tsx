@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { supabase, Song } from '@/lib/supabase'
 import SongViewer from '@/components/SongViewer'
 import SongEditor from '@/components/SongEditor'
@@ -11,6 +11,10 @@ import { useReactToPrint } from 'react-to-print'
 export default function SongPage() {
   const params = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const fromSetlist = searchParams.get('from') === 'setlist'
+  const setlistId = searchParams.get('setlistId')
+  
   const [song, setSong] = useState<Song | null>(null)
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
@@ -36,6 +40,14 @@ export default function SongPage() {
     window.addEventListener('keydown', handleEscape)
     return () => window.removeEventListener('keydown', handleEscape)
   }, [])
+
+  function handleBack() {
+    if (fromSetlist && setlistId) {
+      router.push(`/setlists/${setlistId}`)
+    } else {
+      router.push('/')
+    }
+  }
 
   async function loadSong() {
     const { data, error } = await supabase
@@ -143,6 +155,14 @@ export default function SongPage() {
 
   return (
     <div className="space-y-6">
+      {/* Botón volver */}
+      <button
+        onClick={handleBack}
+        className="flex items-center gap-1 text-gray-600 hover:text-indigo-600 transition"
+      >
+        ← {fromSetlist ? 'Volver al Setlist' : 'Volver a Canciones'}
+      </button>
+
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{song.title}</h1>

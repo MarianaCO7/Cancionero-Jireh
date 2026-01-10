@@ -23,6 +23,7 @@ export default function SongEditor({ song, onSave, onCancel }: Props) {
     category: song.category || '',
   })
   const [customCategory, setCustomCategory] = useState('')
+  const [showCustomInput, setShowCustomInput] = useState(false)
 
   return (
     <div className="space-y-4">
@@ -65,14 +66,16 @@ export default function SongEditor({ song, onSave, onCancel }: Props) {
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
           <select
-            value={form.category}
+            value={showCustomInput ? '__custom__' : form.category}
             onChange={(e) => {
               if (e.target.value === '__custom__') {
+                setShowCustomInput(true)
                 setCustomCategory('')
                 setForm({ ...form, category: '' })
               } else {
-                setForm({ ...form, category: e.target.value })
+                setShowCustomInput(false)
                 setCustomCategory('')
+                setForm({ ...form, category: e.target.value })
               }
             }}
             className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 text-black bg-white"
@@ -83,7 +86,7 @@ export default function SongEditor({ song, onSave, onCancel }: Props) {
             ))}
             <option value="__custom__">+ Otra...</option>
           </select>
-          {(form.category === '__custom__' || customCategory) && (
+          {showCustomInput && (
             <input
               type="text"
               value={customCategory}
@@ -93,6 +96,7 @@ export default function SongEditor({ song, onSave, onCancel }: Props) {
               }}
               className="w-full mt-2 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 text-black"
               placeholder="Escribe la categoría..."
+              autoFocus
             />
           )}
         </div>
