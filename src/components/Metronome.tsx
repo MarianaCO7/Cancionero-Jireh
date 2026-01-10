@@ -134,7 +134,7 @@ export default function Metronome({ initialBpm = 120, onSave, readOnly = false }
             <div 
               key={i}
               className={`w-4 h-4 rounded-full transition-all duration-75 ${
-                isPlaying && (currentBeat - 1 + 4) % 4 === i 
+                isPlaying && currentBeat === i 
                   ? (i === 0 ? 'bg-indigo-500 scale-125' : 'bg-indigo-400 scale-110') 
                   : 'bg-gray-300'
               }`}

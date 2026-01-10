@@ -5,17 +5,19 @@ import { useParams, useRouter } from 'next/navigation'
 import { supabase, Setlist, SetlistSong, Song, Note } from '@/lib/supabase'
 import { useReactToPrint } from 'react-to-print'
 import NotesManager, { parseNotes, stringifyNotes } from '@/components/NotesManager'
+import Metronome from '@/components/Metronome'
 
 export default function SetlistPage() {
   const params = useParams()
   const router = useRouter()
   const [setlist, setSetlist] = useState<Setlist | null>(null)
-  const [setlistSongs, setSetlistSongs] = useState<SetlistSong[]>([])
+  const [setlistSongs, setSetlistSongs] = useState<SetlistSong[]>([])  
   const [allSongs, setAllSongs] = useState<Song[]>([])
   const [showAddSong, setShowAddSong] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(true)
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
+  const [activeMetronome, setActiveMetronome] = useState<string | null>(null)
   const printRef = useRef<HTMLDivElement>(null)
 
   const handlePrint = useReactToPrint({
@@ -232,7 +234,19 @@ export default function SetlistPage() {
                       </a>
                       <span className="text-sm text-gray-400">{ss.song?.original_key}</span>
                       {ss.song?.bpm && (
-                        <span className="text-xs text-gray-400">🥁 {ss.song.bpm}</span>
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault()
+                            setActiveMetronome(activeMetronome === ss.id ? null : ss.id)
+                          }}
+                          className={`text-xs px-2 py-0.5 rounded-full transition-all ${
+                            activeMetronome === ss.id 
+                              ? 'bg-indigo-600 text-white' 
+                              : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                          }`}
+                        >
+                          🥁 {ss.song.bpm} {activeMetronome === ss.id ? '▼' : '▶'}
+                        </button>
                       )}
                     </div>
                     <button
@@ -242,6 +256,13 @@ export default function SetlistPage() {
                       ✕
                     </button>
                   </div>
+                  
+                  {/* Metrónomo expandido */}
+                  {activeMetronome === ss.id && ss.song?.bpm && (
+                    <div className="mt-2 ml-14 max-w-xs print:hidden">
+                      <Metronome initialBpm={ss.song.bpm} readOnly />
+                    </div>
+                  )}
                   
                   {/* Campo de notas - ahora con NotesManager compacto */}
                   <div className="mt-2 ml-14 print:hidden">
