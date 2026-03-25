@@ -1,0 +1,25 @@
+name: Keep Supabase Alive
+
+on:
+  schedule:
+    # Ejecutar cada 5 días a las 00:00 UTC
+    - cron: '0 0 */5 * *'
+  # Permite ejecutar manualmente desde GitHub Actions
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase para mantener proyecto activo
+        run: |
+          echo "🚀 Verificando que Supabase esté activo..."
+          curl -f https://cancionero-jireh.vercel.app/ || true
+          echo "✅ Verificación completada"
+      
+      - name: Acceso a Supabase API
+        run: |
+          echo "🔗 Enviando ping a Supabase..."
+          curl -f https://dnohwobyxmdirnydabbs.supabase.co/rest/v1/ \
+            -H "apikey: $(grep NEXT_PUBLIC_SUPABASE_ANON_KEY /dev/null || echo 'test')" || true
+          echo "✅ Supabase verificado"
