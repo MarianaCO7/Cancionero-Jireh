@@ -115,8 +115,8 @@ export default function SongViewer({ content, originalKey, transposeSemitones }:
 
           elements.push(
             <div key={`inline-${i}`} className="mb-4">
-              <div className="text-indigo-600 font-bold font-mono whitespace-pre" style={{ fontSize: '0.9em' }}>{chordLine}</div>
-              <div className="font-mono whitespace-pre" style={{ color: '#111827' }}>{cleanLine}</div>
+              <div className="text-indigo-600 font-bold font-mono whitespace-pre text-xs md:text-sm" style={{ minHeight: '1.2em' }}>{chordLine}</div>
+              <div className="font-mono whitespace-pre text-sm md:text-base" style={{ color: '#111827' }}>{cleanLine}</div>
             </div>
           )
         } else {
@@ -134,14 +134,14 @@ export default function SongViewer({ content, originalKey, transposeSemitones }:
         if (nextLine && !isChordLine(nextLine) && nextLine.trim() !== '') {
           elements.push(
             <div key={`pair-${i}`} className="mb-4">
-              <div className="text-indigo-600 font-bold font-mono whitespace-pre" style={{ fontSize: '0.9em' }}>{chordLine}</div>
-              <div className="font-mono whitespace-pre" style={{ color: '#111827' }}>{nextLine}</div>
+              <div className="text-indigo-600 font-bold font-mono whitespace-pre text-xs md:text-sm" style={{ minHeight: '1.2em' }}>{chordLine}</div>
+              <div className="font-mono whitespace-pre text-sm md:text-base" style={{ color: '#111827' }}>{nextLine}</div>
             </div>
           )
           i += 2
         } else {
           elements.push(
-            <div key={`chords-${i}`} className="text-indigo-600 font-bold font-mono whitespace-pre mb-2" style={{ fontSize: '0.9em' }}>{chordLine}</div>
+            <div key={`chords-${i}`} className="text-indigo-600 font-bold font-mono whitespace-pre mb-2 text-xs md:text-sm" style={{ minHeight: '1.2em' }}>{chordLine}</div>
           )
           i++
         }
@@ -150,7 +150,7 @@ export default function SongViewer({ content, originalKey, transposeSemitones }:
 
       // Línea normal de texto
       elements.push(
-        <div key={`line-${i}`} className="mb-1 whitespace-pre font-mono" style={{ color: '#111827' }}>{line}</div>
+        <div key={`line-${i}`} className="mb-1 whitespace-pre font-mono text-sm md:text-base" style={{ color: '#111827' }}>{line}</div>
       )
       i++
     }
@@ -162,13 +162,13 @@ export default function SongViewer({ content, originalKey, transposeSemitones }:
 
   return (
     <div className="song-viewer">
-      <div className="mb-4 text-sm text-gray-700">
+      <div className="mb-4 text-xs md:text-sm text-gray-700">
         Tonalidad actual: <span className="font-bold text-indigo-700">{currentKey}</span>
         {transposeSemitones !== 0 && (
           <span className="ml-2 text-gray-500">(Original: {originalKey})</span>
         )}
       </div>
-      <div className="leading-relaxed">
+      <div className="leading-relaxed text-sm md:text-base">
         {renderedContent}
       </div>
     </div>

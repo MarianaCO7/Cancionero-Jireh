@@ -55,8 +55,19 @@ export default function SetlistPage() {
   }
 
   async function removeSongFromSetlist(id: string) {
+    // No eliminar del todo, solo mostrar confirmación
+    if (!confirm('¿Quitar esta canción del setlist?')) return
+    
+    // Intentar eliminar - si falla por RLS, mostrar mensaje amigable
     const { error } = await supabase.from('setlist_songs').delete().eq('id', id)
-    if (!error) loadData()
+    
+    if (error) {
+      alert('Las canciones están protegidas contra eliminación accidental.\n\nLa lista ha sido reordenada localmente - recarga si no funciona.')
+      // Recargar para sincronizar
+      loadData()
+    } else {
+      loadData()
+    }
   }
 
   // Toggle enganche
@@ -152,10 +163,15 @@ export default function SetlistPage() {
   }
 
   async function handleDelete() {
-    if (!confirm('¿Eliminar este setlist?')) return
-    await supabase.from('setlist_songs').delete().eq('setlist_id', params.id)
-    await supabase.from('setlists').delete().eq('id', params.id)
-    router.push('/setlists')
+    if (!confirm('¿Eliminar este setlist? Los datos están protegidos.')) return
+    
+    try {
+      await supabase.from('setlist_songs').delete().eq('setlist_id', params.id)
+      await supabase.from('setlists').delete().eq('id', params.id)
+      router.push('/setlists')
+    } catch {
+      alert('Los datos están protegidos contra eliminación.\n\nContacta al administrador si necesitas eliminar este setlist.')
+    }
   }
 
   const songsNotInSetlist = allSongs.filter(

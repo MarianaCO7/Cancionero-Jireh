@@ -35,15 +35,31 @@ CREATE TABLE setlist_songs (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Habilitar Row Level Security (permitir todo por ahora)
+-- Habilitar Row Level Security (permitir lectura, controlar escritura, bloquear borrado)
 ALTER TABLE songs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE setlists ENABLE ROW LEVEL SECURITY;
 ALTER TABLE setlist_songs ENABLE ROW LEVEL SECURITY;
 
--- Políticas para permitir acceso público (sin autenticación)
-CREATE POLICY "Acceso público a songs" ON songs FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Acceso público a setlists" ON setlists FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Acceso público a setlist_songs" ON setlist_songs FOR ALL USING (true) WITH CHECK (true);
+-- POLÍTICAS para SONGS - Lectura abierta, escritura controlada, DELETE bloqueado
+CREATE POLICY "Leer canciones (público)" ON songs FOR SELECT USING (true);
+CREATE POLICY "Crear canciones (público)" ON songs FOR INSERT WITH CHECK (true);
+CREATE POLICY "Editar canciones (público)" ON songs FOR UPDATE WITH CHECK (true);
+-- Comentado: No se puede borrar canciones (protección contra eliminación accidental)
+-- CREATE POLICY "Borrar canciones" ON songs FOR DELETE USING (false);
+
+-- POLÍTICAS para SETLISTS - Lectura abierta, escritura controlada, DELETE bloqueado
+CREATE POLICY "Leer setlists (público)" ON setlists FOR SELECT USING (true);
+CREATE POLICY "Crear setlists (público)" ON setlists FOR INSERT WITH CHECK (true);
+CREATE POLICY "Editar setlists (público)" ON setlists FOR UPDATE WITH CHECK (true);
+-- Comentado: No se puede borrar setlists (protección contra eliminación accidental)
+-- CREATE POLICY "Borrar setlists" ON setlists FOR DELETE USING (false);
+
+-- POLÍTICAS para SETLIST_SONGS - Lectura abierta, escritura controlada, DELETE bloqueado
+CREATE POLICY "Leer setlist_songs (público)" ON setlist_songs FOR SELECT USING (true);
+CREATE POLICY "Crear setlist_songs (público)" ON setlist_songs FOR INSERT WITH CHECK (true);
+CREATE POLICY "Editar setlist_songs (público)" ON setlist_songs FOR UPDATE WITH CHECK (true);
+-- Comentado: No se puede borrar relaciones (protección contra eliminación accidental)
+-- CREATE POLICY "Borrar setlist_songs" ON setlist_songs FOR DELETE USING (false);
 
 -- Canción de ejemplo
 INSERT INTO songs (title, content, original_key, key_male, key_female) VALUES (

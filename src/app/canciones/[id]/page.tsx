@@ -159,16 +159,9 @@ export default function SongPage() {
   }
 
   async function handleDelete() {
-    if (!song || !confirm('¿Estás seguro de eliminar esta canción?')) return
-    
-    const { error } = await supabase
-      .from('songs')
-      .delete()
-      .eq('id', song.id)
-    
-    if (!error) {
-      router.push('/')
-    }
+    // Las canciones no pueden ser eliminadas para prevenir pérdida de datos
+    // En su lugar, hay que contactar al administrador
+    alert('Las canciones no pueden ser eliminadas para proteger los datos.\n\nSi necesitas eliminar una canción, contacta al administrador.')
   }
 
   if (loading) {
