@@ -1,16 +1,26 @@
 #!/usr/bin/env node
 
 /**
- * Script para importar canciones desde CSV a Supabase
+ * Script para importar canciones desde CSV o XLSX a Supabase
  * Convierte formato de acordes tradicional a ChordPro [ACORDE]
  * 
  * Uso:
  *   node scripts/import-songs.js canciones.csv
+ *   node scripts/import-songs.js canciones.xlsx
  */
 
 const fs = require('fs');
 const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
+
+// Intentar usar xlsx si está disponible, sino usar CSV simple
+let XLSX;
+try {
+  XLSX = require('xlsx');
+} catch (e) {
+  console.warn('⚠️  npm install xlsx para leer archivos .xlsx');
+  console.warn('   Continuando con CSV...\n');
+}
 
 // Configuración de Supabase
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dnohwobyxmdirnydabbs.supabase.co';
@@ -90,49 +100,66 @@ function convertirAFormatoChordPro(contenido) {
 }
 
 /**
- * Procesa línea CSV (compatibilidad mejorada)
+ * Lee archivos CSV o XLSX
  */
-function parseLine(line) {
-  // Simple CSV parser que maneja comillas
-  const regex = /(?:[^,"]+|"[^"]*")+/g;
-  const matches = line.match(regex) || [];
-  return matches.map(m => m.replace(/^"(.*)"$/, '$1').trim());
+function leerArchivo(ruta) {
+  const ext = path.extname(ruta).toLowerCase();
+  
+  if (ext === '.xlsx' && XLSX) {
+    console.log('📊 Leyendo archivo Excel (.xlsx)...');
+    const workbook = XLSX.readFile(ruta);
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const data = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+    return data;
+  } else if (ext === '.csv') {
+    console.log('📄 Leyendo archivo CSV...');
+    const contenido = fs.readFileSync(ruta, 'utf-8');
+    const lineas = contenido.split('\n').filter(l => l.trim());
+    
+    if (lineas.length < 2) {
+      throw new Error('Archivo CSV vacío');
+    }
+    
+    const headers = parseLine(lineas[0]);
+    const data = [];
+    
+    for (let i = 1; i < lineas.length; i++) {
+      const valores = parseLine(lineas[i]);
+      if (valores.length !== headers.length) continue;
+      
+      const obj = {};
+      headers.forEach((h, idx) => {
+        obj[h.toLowerCase().trim()] = valores[idx];
+      });
+      data.push(obj);
+    }
+    
+    return data;
+  } else {
+    throw new Error('Formato no soportado. Usa .xlsx o .csv');
+  }
 }
 
 /**
- * Lee y importa canciones del CSV
+ * Lee y importa canciones del CSV o XLSX
  */
-async function importarCanciones(archivoCSV) {
-  console.log(`📖 Leyendo archivo: ${archivoCSV}`);
+async function importarCanciones(archivo) {
+  console.log(`📖 Leyendo archivo: ${archivo}\n`);
   
-  const contenido = fs.readFileSync(archivoCSV, 'utf-8');
-  const lineas = contenido.split('\n').filter(l => l.trim());
-  
-  if (lineas.length < 2) {
-    console.error('❌ Archivo CSV vacío o inválido');
+  let canciones;
+  try {
+    canciones = leerArchivo(archivo);
+  } catch (err) {
+    console.error(`❌ Error al leer: ${err.message}`);
     process.exit(1);
   }
   
-  // Leer encabezados
-  const headers = parseLine(lineas[0]);
-  console.log(`📋 Encabezados encontrados: ${headers.join(', ')}`);
-  
-  const canciones = [];
-  
-  // Procesar cada línea
-  for (let i = 1; i < lineas.length; i++) {
-    const valores = parseLine(lineas[i]);
-    if (valores.length !== headers.length) continue;
-    
-    const cancion = {};
-    headers.forEach((header, idx) => {
-      cancion[header.toLowerCase().trim()] = valores[idx];
-    });
-    
-    canciones.push(cancion);
+  if (!canciones || canciones.length === 0) {
+    console.error('❌ Archivo vacío o sin datos válidos');
+    process.exit(1);
   }
   
-  console.log(`✅ ${canciones.length} canciones parsed del CSV\n`);
+  console.log(`✅ ${canciones.length} canciones parsed del archivo\n`);
   
   // Convertir y subir a Supabase
   let exitosas = 0;
@@ -151,7 +178,7 @@ async function importarCanciones(archivoCSV) {
         author: cancion.autor || '',
         content: contenidoConvertido,
         original_key: cancion.tono_original || 'G',
-        key_male: cancion.tono_original || 'G',
+        key_male: cancion.tono_hombre || cancion.tono_male || 'G',
         key_female: cancion.tono_mujer || 'B',
         tempo: cancion.tempo || 'media',
         category: cancion.categoria || '',
@@ -184,21 +211,22 @@ async function importarCanciones(archivoCSV) {
 }
 
 // Ejecutar
-const archivoCSV = process.argv[2];
+const archivo = process.argv[2];
 
-if (!archivoCSV) {
-  console.error('❌ Uso: node scripts/import-songs.js [archivo.csv]');
-  console.error('\nEjemplo:');
+if (!archivo) {
+  console.error('❌ Uso: node scripts/import-songs.js [archivo.xlsx o archivo.csv]');
+  console.error('\nEjemplos:');
+  console.error('  node scripts/import-songs.js canciones.xlsx');
   console.error('  node scripts/import-songs.js canciones.csv');
   process.exit(1);
 }
 
-if (!fs.existsSync(archivoCSV)) {
-  console.error(`❌ Archivo no encontrado: ${archivoCSV}`);
+if (!fs.existsSync(archivo)) {
+  console.error(`❌ Archivo no encontrado: ${archivo}`);
   process.exit(1);
 }
 
-importarCanciones(archivoCSV).catch(err => {
+importarCanciones(archivo).catch(err => {
   console.error('❌ Error fatal:', err);
   process.exit(1);
 });
