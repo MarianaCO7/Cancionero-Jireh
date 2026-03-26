@@ -60,7 +60,7 @@ export default function Home() {
       <SearchBar value={search} onChange={setSearch} />
 
       {/* Filtros */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 items-center">
         <select
           value={filterTempo}
           onChange={(e) => setFilterTempo(e.target.value)}
@@ -89,6 +89,14 @@ export default function Home() {
             ✕ Limpiar filtros
           </button>
         )}
+        
+        {/* Contador de canciones */}
+        <div className="ml-auto text-sm font-medium text-indigo-600 flex items-center gap-1">
+          <span>🎵</span>
+          <span>
+            {filteredSongs.length} de {songs.length} canción{songs.length !== 1 ? 'es' : ''}
+          </span>
+        </div>
       </div>
 
       {filteredSongs.length === 0 ? (
