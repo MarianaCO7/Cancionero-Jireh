@@ -32,6 +32,7 @@ CREATE TABLE setlist_songs (
   position INTEGER NOT NULL DEFAULT 0,
   linked_to_next BOOLEAN DEFAULT FALSE,
   notes TEXT DEFAULT '',
+  selected_key TEXT DEFAULT 'original',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

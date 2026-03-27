@@ -91,6 +91,19 @@ export default function SetlistPage() {
     ))
   }
 
+  // Actualizar tonalidad seleccionada
+  async function updateSelectedKey(id: string, selectedKey: string) {
+    const { error } = await supabase
+      .from('setlist_songs')
+      .update({ selected_key: selectedKey })
+      .eq('id', id)
+    if (!error) {
+      setSetlistSongs(prev => prev.map(ss => 
+        ss.id === id ? { ...ss, selected_key: selectedKey } : ss
+      ))
+    }
+  }
+
   // Drag and drop handlers
   function handleDragStart(index: number) {
     setDraggedIndex(index)
@@ -246,7 +259,7 @@ export default function SetlistPage() {
                         {index + 1}
                       </span>
                       <a 
-                        href={`/canciones/${ss.song_id}?from=setlist&setlistId=${params.id}&position=${index}`}
+                        href={`/canciones/${ss.song_id}?from=setlist&setlistId=${params.id}&position=${index}&selectedKey=${ss.selected_key || 'original'}`}
                         className="font-medium hover:text-indigo-600"
                       >
                         {ss.song?.title}
@@ -283,6 +296,47 @@ export default function SetlistPage() {
                     </div>
                   )}
                   
+                  {/* Selector de tonalidad */}
+                  <div className="mt-2 ml-14 flex gap-2 items-center print:hidden">
+                    <span className="text-xs text-gray-500">Tono:</span>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => updateSelectedKey(ss.id, 'original')}
+                        className={`px-2 py-1 text-xs rounded transition-all ${
+                          (ss.selected_key === 'original' || !ss.selected_key) 
+                            ? 'bg-indigo-600 text-white' 
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        Original ({ss.song?.original_key})
+                      </button>
+                      {ss.song?.tono_mujer && (
+                        <button
+                          onClick={() => updateSelectedKey(ss.id, 'mujer')}
+                          className={`px-2 py-1 text-xs rounded transition-all ${
+                            ss.selected_key === 'mujer' 
+                              ? 'bg-indigo-600 text-white' 
+                              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                          }`}
+                        >
+                          Mujer ({ss.song.tono_mujer})
+                        </button>
+                      )}
+                      {ss.song?.tono_hombre && (
+                        <button
+                          onClick={() => updateSelectedKey(ss.id, 'hombre')}
+                          className={`px-2 py-1 text-xs rounded transition-all ${
+                            ss.selected_key === 'hombre' 
+                              ? 'bg-indigo-600 text-white' 
+                              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                          }`}
+                        >
+                          Hombre ({ss.song.tono_hombre})
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
                   {/* Campo de notas - ahora con NotesManager compacto */}
                   <div className="mt-2 ml-14 print:hidden">
                     <NotesManager

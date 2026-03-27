@@ -13,6 +13,8 @@ export type Song = {
   original_key: string
   key_male: string
   key_female: string
+  tono_hombre?: string
+  tono_mujer?: string
   tempo: string
   category: string
   bpm: number | null
@@ -52,5 +54,6 @@ export type SetlistSong = {
   position: number
   linked_to_next: boolean
   notes: string // JSON array of Note objects
+  selected_key?: string // 'original' | 'hombre' | 'mujer' | semitone value
   song?: Song
 }

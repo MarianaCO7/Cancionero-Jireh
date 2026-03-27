@@ -9,13 +9,15 @@ import Transposer from '@/components/Transposer'
 import Metronome from '@/components/Metronome'
 import NotesManager, { parseNotes, stringifyNotes } from '@/components/NotesManager'
 import { useReactToPrint } from 'react-to-print'
+import { getSemitonesDifference } from '@/lib/chordUtils'
 
 export default function SongPage() {
   const params = useParams()
   const router = useRouter()
   const searchParams = useSearchParams()
   const fromSetlist = searchParams.get('from') === 'setlist'
-  const setlistId = searchParams.get('setlistId')
+  const setlistId = searchParams.get('setlist')
+  const selectedKey = searchParams.get('selectedKey')  // NEW
   
   const [song, setSong] = useState<Song | null>(null)
   const [loading, setLoading] = useState(true)
@@ -52,7 +54,7 @@ export default function SongPage() {
     if (!setlistId) return
     const { data } = await supabase
       .from('setlist_songs')
-      .select('*, song:songs(*)')
+      .select('*, songs(*)')
       .eq('setlist_id', setlistId)
       .order('position')
     if (data) {
@@ -74,6 +76,26 @@ export default function SongPage() {
       setCurrentSetlistSong(current || null)
     }
   }, [setlistSongs, params.id])
+
+  // NUEVO: Aplicar tonalidad automáticamente cuando la canción carga y hay selectedKey
+  useEffect(() => {
+    if (!song || !selectedKey) return
+
+    let newSemitones = 0
+
+    if (selectedKey === 'hombre' && song.tono_hombre) {
+      newSemitones = getSemitonesDifference(song.original_key, song.tono_hombre)
+    } else if (selectedKey === 'mujer' && song.tono_mujer) {
+      newSemitones = getSemitonesDifference(song.original_key, song.tono_mujer)
+    } else if (selectedKey === 'original') {
+      newSemitones = 0
+    } else if (selectedKey && selectedKey.startsWith('+') || selectedKey.startsWith('-')) {
+      // Tonalidad personalizada: '+2', '-3', etc.
+      newSemitones = parseInt(selectedKey, 10)
+    }
+
+    setTransposeSemitones(newSemitones)
+  }, [song, selectedKey])
 
   // Función para actualizar notas del setlist
   async function updateSetlistNotes(notes: Note[]) {
@@ -242,8 +264,8 @@ export default function SongPage() {
           
           <Transposer
             originalKey={song.original_key}
-            keyMale={song.key_male}
-            keyFemale={song.key_female}
+            tonoHombre={song.tono_hombre}
+            tonoMujer={song.tono_mujer}
             currentSemitones={transposeSemitones}
             onChange={setTransposeSemitones}
             compact
@@ -436,8 +458,8 @@ export default function SongPage() {
 
           <Transposer
             originalKey={song.original_key}
-            keyMale={song.key_male}
-            keyFemale={song.key_female}
+            tonoHombre={song.tono_hombre}
+            tonoMujer={song.tono_mujer}
             currentSemitones={transposeSemitones}
             onChange={setTransposeSemitones}
           />
